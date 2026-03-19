@@ -1,0 +1,26 @@
+name: nips_templatebank
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pytorch>=2.5
+  - pytorch-cuda=12.4
+  - torchvision
+  - torchaudio
+  - numpy
+  - pandas
+  - scikit-learn
+  - networkx
+  - pip:
+      - transformers>=4.47
+      - datasets>=3.0
+      - accelerate>=1.1
+      - sentence-transformers
+      - faiss-cpu
+      - evaluate
+      - wandb
+      - hydra-core
