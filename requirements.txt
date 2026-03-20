@@ -6,6 +6,8 @@ torchaudio==2.10.0
 transformers==5.3.0
 accelerate==1.13.0
 datasets>=3.0
+peft>=0.13
+trl>=0.12
 sentence-transformers
 faiss-cpu
 evaluate
@@ -16,3 +18,4 @@ pandas
 scikit-learn
 networkx
 huggingface_hub
+pyyaml
