@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "timestamp_utc": "20260319_174758",
+    "input_csv": "/home/Administrator/nips_projects/nips-adathink/results/per_sample_Qwen3_8B_20260227_140410.csv",
+    "train_size": 160,
+    "test_size": 40,
+    "lambda_cost": 0.15,
+    "default_action": 256,
+    "template_count_train": 93
+  },
+  "static_memory_test": {
+    "accuracy": 0.5,
+    "avg_tokens": 39.35,
+    "avg_utility": 0.47694335937500004,
+    "reuse_rate": 0.65
+  },
+  "dynamic_memory_test": {
+    "accuracy": 0.5,
+    "avg_tokens": 39.35,
+    "avg_utility": 0.47694335937500004,
+    "reuse_rate": 0.7
+  },
+  "fixed_baselines_test": {
+    "fixed64": {
+      "accuracy": 0.35,
+      "avg_tokens": 21.25,
+      "avg_utility": 0.337548828125
+    },
+    "fixed128": {
+      "accuracy": 0.4,
+      "avg_tokens": 31.875,
+      "avg_utility": 0.3813232421875
+    },
+    "fixed256": {
+      "accuracy": 0.525,
+      "avg_tokens": 43.25,
+      "avg_utility": 0.49965820312500003
+    }
+  }
+}
