@@ -7,19 +7,17 @@ set -euo pipefail
 #  Pipeline: extract_templates → template_operations → train_compiler
 #            → eval → ablations → paper tables
 #
-#  Requirements: 8x GPU (A100-80GB recommended)
+#  Hardware: 4–8× A100-80GB (auto-detected)
 #  Estimated time: ~18-24 hours total
 #####################################################################
 
-export HF_ENDPOINT="https://hf-mirror.com"
-export NCCL_P2P_DISABLE=0
-export NCCL_IB_DISABLE=0
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2,3,4,5,6,7}
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=gpu_utils.sh
+source "${SCRIPT_DIR}/gpu_utils.sh"
+auto_setup
+
 CONFIG="${PROJECT_DIR}/configs/template_config.yaml"
-NUM_GPUS=${NUM_GPUS:-8}
 
 TEMPLATE_DIR="${PROJECT_DIR}/results/templates"
 OPS_DIR="${PROJECT_DIR}/results/operations"
@@ -72,9 +70,7 @@ echo ""
 echo "========== STAGE 3: Train Compiler =========="
 
 echo "  --- Stage 3a: Template Selection SFT ---"
-torchrun \
-    --nproc_per_node=${NUM_GPUS} \
-    --master_port=29800 \
+$(get_torchrun_cmd "$NUM_GPUS") \
     scripts/train_template_compiler.py \
         --config "$CONFIG" \
         --training_data "${TEMPLATE_DIR}/compiler_training_data.json" \
@@ -83,9 +79,7 @@ torchrun \
     2>&1 | tee results/stage3a_selection.log
 
 echo "  --- Stage 3b: Variable Filling SFT ---"
-torchrun \
-    --nproc_per_node=${NUM_GPUS} \
-    --master_port=29810 \
+$(get_torchrun_cmd "$NUM_GPUS") \
     scripts/train_template_compiler.py \
         --config "$CONFIG" \
         --training_data "${TEMPLATE_DIR}/compiler_training_data.json" \
@@ -116,14 +110,14 @@ echo ""
 echo "========== STAGE 5: Ablations =========="
 
 for BANK_SIZE in 10 25 50 100 200 300; do
-    ABLATION_DIR="${PROJECT_DIR}/results/ablation_bank_${BANK_SIZE}"
-    mkdir -p "$ABLATION_DIR"
+    ABL_DIR="${PROJECT_DIR}/results/ablation_bank_${BANK_SIZE}"
+    mkdir -p "$ABL_DIR"
     echo "  Testing bank size: ${BANK_SIZE}"
     python scripts/run_template_operations.py \
         --config "$CONFIG" \
         --template_bank "${TEMPLATE_DIR}/template_bank.json" \
-        --output_dir "$ABLATION_DIR" \
-        2>&1 | tee "${ABLATION_DIR}/ablation.log"
+        --output_dir "$ABL_DIR" \
+        2>&1 | tee "${ABL_DIR}/ablation.log"
 done
 
 echo "  [DONE] Stage 5 — Ablations complete"
