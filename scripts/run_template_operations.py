@@ -37,7 +37,6 @@ from src.template_algebra import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 
 def load_test_datasets(config: dict) -> dict:

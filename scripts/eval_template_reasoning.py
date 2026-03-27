@@ -41,7 +41,6 @@ from src.template_algebra import TemplateAlgebra, TemplateBank
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 
 def extract_answer(text: str) -> str | None:

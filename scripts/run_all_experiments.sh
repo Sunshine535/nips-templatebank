@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export TOKENIZERS_PARALLELISM=false
 
@@ -79,12 +78,15 @@ if ! is_phase_done 3; then
 fi
 
 # Stage 4: Full Evaluation
+# Use TEMPLATEBANK_EVAL_MAX_SAMPLES to cap per-dataset samples (default 500 for speed)
+EVAL_MAX_SAMPLES="${TEMPLATEBANK_EVAL_MAX_SAMPLES:-500}"
 if ! is_phase_done 4; then
-    echo "========== STAGE 4: Evaluation =========="
+    echo "========== STAGE 4: Evaluation (max_samples=${EVAL_MAX_SAMPLES}) =========="
     python scripts/eval_template_reasoning.py \
         --config "$CONFIG" --compiler_dir "${COMPILER_DIR}/stage2_filling" \
         --template_bank "${TEMPLATE_DIR}/template_bank.json" \
         --output_dir "$EVAL_DIR" \
+        --max_samples "$EVAL_MAX_SAMPLES" \
         2>&1 | tee "$LOG_DIR/stage4_eval.log"
     phase_done 4
 fi

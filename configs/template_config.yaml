@@ -1,7 +1,6 @@
 extraction:
   teacher_model: "Qwen/Qwen3.5-9B"
   student_model: "Qwen/Qwen3.5-9B"
-  hf_endpoint: "https://hf-mirror.com"
   source_datasets:
     - name: "gsm8k"
       dataset_id: "openai/gsm8k"
