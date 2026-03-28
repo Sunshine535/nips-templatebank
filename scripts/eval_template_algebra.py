@@ -149,12 +149,12 @@ def main():
     base_model = config["extraction"]["student_model"]
     logger.info("Loading model: %s", base_model)
 
-    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(
-        base_model, torch_dtype=torch.bfloat16, trust_remote_code=True, device_map="auto",
+        base_model, torch_dtype=torch.bfloat16, device_map="auto",
     )
 
     # Load compiler adapter

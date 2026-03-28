@@ -123,7 +123,7 @@ def train_stage(
         base_model_name,
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
-        attn_implementation="flash_attention_2",
+        attn_implementation="sdpa",
         device_map={"": int(os.environ.get("LOCAL_RANK", 0))},
     )
     model.config.use_cache = False

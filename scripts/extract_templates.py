@@ -334,11 +334,11 @@ def main():
     logger.info("=" * 50)
     logger.info("  STEP 2: Load Model — %s", model_name)
     logger.info("=" * 50)
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
-        model_name, torch_dtype=torch.bfloat16, trust_remote_code=True, device_map="auto",
+        model_name, torch_dtype=torch.bfloat16, device_map="auto",
     )
     model.eval()
 

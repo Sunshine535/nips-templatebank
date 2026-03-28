@@ -315,12 +315,12 @@ def main():
 
     # Load model
     logger.info("Loading model: %s", base_model)
-    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(
-        base_model, torch_dtype=torch.bfloat16, trust_remote_code=True, device_map="auto",
+        base_model, torch_dtype=torch.bfloat16, device_map="auto",
     )
 
     compiler_adapter = os.path.join(args.compiler_dir, "adapter_config.json")
@@ -371,7 +371,7 @@ def main():
         # Method 1: Direct CoT (reload base model without adapter)
         if not args.skip_direct_cot:
             base_model_obj = AutoModelForCausalLM.from_pretrained(
-                base_model, torch_dtype=torch.bfloat16, trust_remote_code=True, device_map="auto",
+                base_model, torch_dtype=torch.bfloat16, device_map="auto",
             )
             base_model_obj.eval()
             ds_results["direct_cot"] = evaluate_direct_cot(base_model_obj, tokenizer, ds, max_s, max_tokens)
