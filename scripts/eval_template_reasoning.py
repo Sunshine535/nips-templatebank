@@ -357,9 +357,9 @@ def main():
         try:
             subset = ds_cfg.get("subset")
             if subset:
-                ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["split"], trust_remote_code=True)
+                ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["split"])
             else:
-                ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["split"], trust_remote_code=True)
+                ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["split"])
             if len(ds) > max_s:
                 ds = ds.shuffle(seed=42).select(range(max_s))
         except Exception as e:

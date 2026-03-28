@@ -47,9 +47,9 @@ def load_test_datasets(config: dict) -> dict:
         try:
             subset = ds_cfg.get("subset")
             if subset:
-                ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["split"], trust_remote_code=True)
+                ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["split"])
             else:
-                ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["split"], trust_remote_code=True)
+                ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["split"])
             max_s = ds_cfg.get("max_samples", 1000)
             if len(ds) > max_s:
                 ds = ds.shuffle(seed=42).select(range(max_s))
