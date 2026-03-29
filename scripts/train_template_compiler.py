@@ -10,6 +10,7 @@ Grammar-constrained decoding ensures template structure validity.
 """
 
 import argparse
+import glob
 import json
 import logging
 import os
@@ -25,6 +26,13 @@ from trl import SFTConfig, SFTTrainer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def find_latest_checkpoint(output_dir):
+    """Find the latest checkpoint directory in output_dir."""
+    ckpts = sorted(glob.glob(os.path.join(output_dir, "checkpoint-*")),
+                   key=lambda x: int(x.split("-")[-1]) if x.split("-")[-1].isdigit() else 0)
+    return ckpts[-1] if ckpts else None
 
 
 SYSTEM_PROMPTS = {
@@ -107,6 +115,7 @@ def train_stage(
     train_cfg: dict,
     stage_overrides: dict,
     adapter_path: str | None = None,
+    resume_from_checkpoint: str = "auto",
 ):
     """Train one stage of the compiler."""
     logger.info("=" * 50)
@@ -177,8 +186,17 @@ def train_stage(
         processing_class=tokenizer,
     )
 
+    resume_ckpt = None
+    if resume_from_checkpoint != "none":
+        if resume_from_checkpoint == "auto":
+            resume_ckpt = find_latest_checkpoint(output_dir)
+        else:
+            resume_ckpt = resume_from_checkpoint
+        if resume_ckpt:
+            logger.info("Resuming from checkpoint: %s", resume_ckpt)
+
     logger.info("Starting training (epochs=%d, lr=%.2e)...", epochs, lr)
-    trainer.train()
+    trainer.train(resume_from_checkpoint=resume_ckpt)
 
     logger.info("Saving model to %s", output_dir)
     trainer.save_model(output_dir)
@@ -210,6 +228,8 @@ def main():
     parser.add_argument("--output_dir", type=str, default="results/compiler")
     parser.add_argument("--skip_stage1", action="store_true")
     parser.add_argument("--skip_stage2", action="store_true")
+    parser.add_argument("--resume_from_checkpoint", type=str, default="auto",
+                        help="Resume from checkpoint. 'auto' finds latest, path for specific, 'none' to disable")
     parser.add_argument("--local_rank", type=int, default=-1)
     args = parser.parse_args()
 
@@ -243,6 +263,7 @@ def main():
             lora_cfg=lora_cfg,
             train_cfg=train_cfg,
             stage_overrides=overrides,
+            resume_from_checkpoint=args.resume_from_checkpoint,
         )
 
     # Stage 2: Variable Filling (continues from Stage 1 adapter)
@@ -257,6 +278,7 @@ def main():
             train_cfg=train_cfg,
             stage_overrides=overrides,
             adapter_path=stage1_dir,
+            resume_from_checkpoint=args.resume_from_checkpoint,
         )
 
     logger.info("=" * 60)
