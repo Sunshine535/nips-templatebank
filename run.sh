@@ -34,7 +34,7 @@ echo "  Log file: $PROJ_DIR/run.log"
 echo "  To run in background: nohup bash run.sh > run.log 2>&1 &"
 echo ""
 
-bash scripts/run_all_experiments.sh 2>&1 | tee "$PROJ_DIR/run.log"
+bash scripts/run_all_experiments.sh "$@" 2>&1 | tee "$PROJ_DIR/run.log"
 EXIT_CODE=${PIPESTATUS[0]}
 
 echo ""

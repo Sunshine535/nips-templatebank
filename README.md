@@ -1,94 +1,120 @@
-# Template Algebra: Formal Reasoning Template Composition for Mathematical Problem Solving
+# Subroutine Composition for Mathematical Reasoning
 
----
+Can reusable subroutines improve program-compound generalization beyond a strong primitive DSL?
+
+We build a typed subroutine library from math CoT traces and train a planner that composes subroutines for new problems. On a CFQ-style MCD split, composition outperforms flat programs on unseen subroutine combinations while using fewer tokens.
 
 ## Quick Start
 
 ```bash
-# 1. Clone and enter project
 git clone https://github.com/Sunshine535/nips-templatebank.git
 cd nips-templatebank
 
-# 2. Install dependencies
+# Setup environment
 bash setup.sh
 
-# 3. Run all experiments
+# Smoke test (fast, uses student model, ~50 examples)
+bash run.sh --smoke
+
+# Full pipeline (~1970 GPU-hours on 8xA100)
 bash run.sh
-
-# 4. (Optional) Run in background for long experiments
-nohup bash run.sh > run.log 2>&1 &
-tail -f run.log
-```
-
-### Check Completion
-
-```bash
-cat results/.pipeline_done   # Shows PIPELINE_COMPLETE when all phases finish
-ls results/.phase_markers/   # See which individual phases completed
-```
-
-### Save and Send Results
-
-```bash
-# Option A: Push to GitHub
-git add results/ logs/
-git commit -m "Experiment results"
-git push origin main
-
-# Option B: Package as tarball
-bash collect_results.sh
-# Output: results_archive/nips-templatebank_results_YYYYMMDD_HHMMSS.tar.gz
 ```
 
 ### Resume After Interruption
 
 Re-run `bash run.sh` — completed phases are automatically skipped.
-To force re-run all phases: `FORCE_RERUN=1 bash run.sh`
+Force re-run: `FORCE_RERUN=1 bash run.sh`
+
+### Check Progress
+
+```bash
+ls results/.phase_markers/     # See completed phases
+cat results/.pipeline_done     # Shows PIPELINE_COMPLETE when done
+```
+
+## Method Overview
+
+```
+Phase 1: Teacher (32B) generates executable JSON-AST programs for GSM8K/MATH
+Phase 2: Mine subroutine library (L=16) by structural clustering + MDL
+Phase 3: Build MCD split (maximize compound divergence, low atom TVD)
+Phase 4a: Train compose planner (9B + LoRA): problem -> composition plan
+Phase 4b: Train flat-program baseline (same DSL, no library calls)
+Phase 5: Evaluate on MCD split + IID split with all baselines
+Phase 6: Library size ablation (L = 4, 8, 16, 32)
+```
 
 ## Project Structure
 
 ```
 nips-templatebank/
-├── README.md
-├── LICENSE                              # MIT License
-├── setup.sh                             # One-command environment setup
-├── requirements.txt                     # Pinned dependencies
-├── configs/
-│   └── template_config.yaml             # Template extraction + training config
+├── src/
+│   ├── template_dsl.py          # Typed DSL: programs, subroutines, executor
+│   ├── mcd_split.py             # CFQ-style MCD split builder
+│   └── template_algebra.py      # Legacy template algebra operations
 ├── scripts/
-│   ├── gpu_utils.sh                     # Shared GPU auto-detection
-│   ├── run_all_experiments.sh           # Master pipeline (5 stages)
-│   ├── extract_templates.py             # Stage 1: CoT → template bank
-│   ├── run_template_operations.py       # Stage 2: 6 algebra operations
-│   ├── train_template_compiler.py       # Stage 3: Two-stage SFT compiler
-│   └── eval_template_reasoning.py       # Stage 4: GSM8K + MATH evaluation
-├── src/                                 # Core library modules
-├── results/                             # Experiment outputs
-├── logs/                                # Training logs
-└── docs/                                # Additional documentation
+│   ├── run_all_experiments.sh   # Master pipeline (6 stages)
+│   ├── extract_templates.py     # Stage 1: teacher -> programs -> library
+│   ├── build_mcd_split.py       # Stage 2: MCD split construction
+│   ├── train_template_compiler.py  # Stage 3: planner + flat baseline training
+│   ├── eval_template_reasoning.py  # Stage 4: full evaluation
+│   └── gpu_utils.sh             # GPU auto-detection
+├── configs/
+│   └── template_config.yaml     # All experiment configuration
+├── results/                     # Experiment outputs
+├── logs/                        # Training/eval logs
+└── ARIS_REVIEW.md               # Research review and experiment plan
 ```
 
-## Experiments
+## Evaluation Methods
 
-| # | Stage | Description | Est. Time (8×A100) |
-|---|-------|-------------|-------------------|
-| 1 | Template Extraction | Extract reasoning templates from GSM8K + MATH CoT traces | ~24 hrs |
-| 2 | Template Operations | Test 6 algebraic operations on extracted template bank | ~36 hrs |
-| 3 | Compiler Training | Two-stage SFT: (a) template selection, (b) variable filling | ~120 hrs |
-| 4 | Evaluation | GSM8K + MATH accuracy vs. CoT baselines + ablations | ~48 hrs |
-| 5 | Ablation Studies | Bank size sweep (10–300 templates), operation-type ablation | ~24 hrs |
+| Method | Description |
+|--------|-------------|
+| compose | Our method: planner outputs composition plan using subroutine library |
+| flat_inline | Critical baseline: same DSL, no library calls |
+| direct_cot | Standard chain-of-thought prompting |
+| cot_budget | Compute-matched CoT with majority vote |
 
-## Timeline & GPU Hours
+## Metrics
 
-- **Model**: Qwen/Qwen3.5-9B
-- **Total estimated GPU-hours**: ~4920 (8× A100-80GB)
-- **Wall-clock time**: ~25–27 days on 8× A100
+- `accuracy`: End-to-end correctness
+- `valid_plan_rate`: Fraction of outputs that parse as valid plans/programs
+- `execution_success`: Fraction that execute without errors
+- `fallback_rate`: Fraction routed to CoT fallback
+- `fallback_free_accuracy`: Accuracy excluding fallback cases
+- `total_tokens`: Average tokens per problem
+- `latency`: Wall-clock time per problem
+
+## Key Design Decisions
+
+1. **Same DSL for compose and flat** — isolates the composition benefit
+2. **Opaque subroutine IDs** (L00-L15) — no information leakage from names
+3. **MCD split** — maximizes unseen compound divergence while keeping atom distribution similar
+4. **Deterministic executor** — all programs are executable, not just text
+5. **Fallback pipeline** — CoT fallback when plans fail (tracked separately)
+
+## Compute Budget
+
+| Stage | Description | Est. GPU-hours |
+|-------|-------------|----------------|
+| 1 | Program extraction (32B teacher) | ~220 |
+| 2 | MCD split construction | ~10 |
+| 3a | Compose planner training | ~300 |
+| 3b | Flat baseline training | ~300 |
+| 4 | Full evaluation | ~240 |
+| 5 | Library size ablation | ~220 |
+| | **Total** | **~1290** |
+
+## Models
+
+- **Teacher**: Qwen/Qwen3.5-32B (program extraction only)
+- **Planner/Baseline**: Qwen/Qwen3.5-9B + LoRA (r=64, α=128)
 
 ## Citation
 
 ```bibtex
-@inproceedings{templatealgebra2026neurips,
-  title     = {Template Algebra: Formal Reasoning Template Composition for Mathematical Problem Solving},
+@inproceedings{subroutinecomposition2026neurips,
+  title     = {Subroutine Composition for Mathematical Reasoning},
   author    = {Anonymous},
   booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
   year      = {2026}
@@ -97,4 +123,4 @@ nips-templatebank/
 
 ## License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details.

@@ -9,13 +9,11 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 source "${SCRIPT_DIR}/gpu_utils.sh"
 auto_setup
 
-PROJ_DIR_ROOT="$PROJECT_DIR"
-if [ -f "$PROJ_DIR_ROOT/.venv/bin/activate" ]; then
-    source "$PROJ_DIR_ROOT/.venv/bin/activate"
+if [ -f "$PROJECT_DIR/.venv/bin/activate" ]; then
+    source "$PROJECT_DIR/.venv/bin/activate"
 fi
 export PATH="$HOME/.local/bin:$PATH"
 
-# --- Phase resume ---
 PHASE_MARKER_DIR="$PROJECT_DIR/results/.phase_markers"
 mkdir -p "$PHASE_MARKER_DIR"
 FORCE_RERUN="${FORCE_RERUN:-0}"
@@ -28,80 +26,99 @@ is_phase_done() {
 
 CONFIG="${PROJECT_DIR}/configs/template_config.yaml"
 TEMPLATE_DIR="${PROJECT_DIR}/results/templates"
-OPS_DIR="${PROJECT_DIR}/results/operations"
-COMPILER_DIR="${PROJECT_DIR}/results/compiler"
+PLANNER_DIR="${PROJECT_DIR}/results/planner"
 EVAL_DIR="${PROJECT_DIR}/results/eval"
 LOG_DIR="${PROJECT_DIR}/logs"
 
 cd "$PROJECT_DIR"
 mkdir -p results "$LOG_DIR"
 
+# Quick sanity check mode: use --smoke flag or SMOKE=1 env var
+SMOKE="${SMOKE:-0}"
+SMOKE_MAX="${SMOKE_MAX:-50}"
+MAX_PER_SOURCE_FLAG=""
+MAX_SAMPLES_FLAG=""
+if [[ "${1:-}" == "--smoke" ]] || [[ "$SMOKE" == "1" ]]; then
+    SMOKE=1
+    MAX_PER_SOURCE_FLAG="--max_per_source $SMOKE_MAX"
+    MAX_SAMPLES_FLAG="--max_samples $SMOKE_MAX"
+    echo "=== SMOKE TEST MODE (max $SMOKE_MAX per source) ==="
+fi
+
 echo "================================================================"
-echo "  Template Algebra — Full Experiment Pipeline"
-echo "  Model: Qwen/Qwen3.5-9B | GPUs: ${NUM_GPUS}"
+echo "  Subroutine Composition — Full Experiment Pipeline"
+echo "  Planner: Qwen/Qwen3.5-9B | Teacher: Qwen/Qwen3.5-32B"
+echo "  GPUs: ${NUM_GPUS} | Smoke: ${SMOKE}"
 echo "================================================================"
 
-# Stage 1: Extract Templates
+# Stage 1: Extract programs + build library + composition plans
 if ! is_phase_done 1; then
-    echo "========== STAGE 1: Extract Templates =========="
+    echo "========== STAGE 1: Extract Programs & Build Library =========="
+    EXTRA_FLAGS=""
+    if [[ "$SMOKE" == "1" ]]; then
+        EXTRA_FLAGS="--use_student --synthetic"
+    fi
     python scripts/extract_templates.py \
         --config "$CONFIG" --output_dir "$TEMPLATE_DIR" \
+        $MAX_PER_SOURCE_FLAG $EXTRA_FLAGS \
         2>&1 | tee "$LOG_DIR/stage1_extract.log"
     phase_done 1
 fi
 
-# Stage 2: Template Algebra Operations
+# Stage 2: Build MCD split
 if ! is_phase_done 2; then
-    echo "========== STAGE 2: Template Operations =========="
-    python scripts/run_template_operations.py \
-        --config "$CONFIG" --template_bank "${TEMPLATE_DIR}/template_bank.json" \
-        --output_dir "$OPS_DIR" \
-        2>&1 | tee "$LOG_DIR/stage2_operations.log"
+    echo "========== STAGE 2: Build MCD Split =========="
+    python scripts/build_mcd_split.py \
+        --plans "${TEMPLATE_DIR}/plans_with_programs.json" \
+        --output "${PROJECT_DIR}/results/mcd_split.json" \
+        2>&1 | tee "$LOG_DIR/stage2_mcd_split.log"
     phase_done 2
 fi
 
-# Stage 3: Train Template Compiler
-if ! is_phase_done 3; then
-    echo "========== STAGE 3: Train Compiler =========="
-    echo "  --- Stage 3a: Template Selection SFT ---"
+# Stage 3a: Train compose planner
+if ! is_phase_done 3a; then
+    echo "========== STAGE 3a: Train Compose Planner =========="
     $(get_torchrun_cmd "$NUM_GPUS") scripts/train_template_compiler.py \
-        --config "$CONFIG" --training_data "${TEMPLATE_DIR}/compiler_training_data.json" \
-        --output_dir "$COMPILER_DIR" --skip_stage2 \
-        2>&1 | tee "$LOG_DIR/stage3a_selection.log"
-
-    echo "  --- Stage 3b: Variable Filling SFT ---"
-    $(get_torchrun_cmd "$NUM_GPUS") scripts/train_template_compiler.py \
-        --config "$CONFIG" --training_data "${TEMPLATE_DIR}/compiler_training_data.json" \
-        --output_dir "$COMPILER_DIR" --skip_stage1 \
-        2>&1 | tee "$LOG_DIR/stage3b_filling.log"
-    phase_done 3
+        --config "$CONFIG" --mode compose \
+        --training_data "${TEMPLATE_DIR}/compose_train.json" \
+        --output_dir "${PLANNER_DIR}/compose" \
+        2>&1 | tee "$LOG_DIR/stage3a_compose.log"
+    phase_done 3a
 fi
 
-# Stage 4: Full Evaluation
-# Use TEMPLATEBANK_EVAL_MAX_SAMPLES to cap per-dataset samples (default 500 for speed)
-EVAL_MAX_SAMPLES="${TEMPLATEBANK_EVAL_MAX_SAMPLES:-500}"
+# Stage 3b: Train flat-program baseline
+if ! is_phase_done 3b; then
+    echo "========== STAGE 3b: Train Flat-Program Baseline =========="
+    $(get_torchrun_cmd "$NUM_GPUS") scripts/train_template_compiler.py \
+        --config "$CONFIG" --mode flat \
+        --training_data "${TEMPLATE_DIR}/flat_train.json" \
+        --output_dir "${PLANNER_DIR}/flat" \
+        2>&1 | tee "$LOG_DIR/stage3b_flat.log"
+    phase_done 3b
+fi
+
+# Stage 4: Full evaluation
+EVAL_MAX="${EVAL_MAX_SAMPLES:-500}"
 if ! is_phase_done 4; then
-    echo "========== STAGE 4: Evaluation (max_samples=${EVAL_MAX_SAMPLES}) =========="
+    echo "========== STAGE 4: Evaluation (max=${EVAL_MAX}) =========="
     python scripts/eval_template_reasoning.py \
-        --config "$CONFIG" --compiler_dir "${COMPILER_DIR}/stage2_filling" \
-        --template_bank "${TEMPLATE_DIR}/template_bank.json" \
+        --config "$CONFIG" \
+        --compose_dir "${PLANNER_DIR}/compose" \
+        --flat_dir "${PLANNER_DIR}/flat" \
+        --library_path "${TEMPLATE_DIR}/subroutine_library.json" \
         --output_dir "$EVAL_DIR" \
-        --max_samples "$EVAL_MAX_SAMPLES" \
+        $MAX_SAMPLES_FLAG \
         2>&1 | tee "$LOG_DIR/stage4_eval.log"
     phase_done 4
 fi
 
-# Stage 5: Ablations
+# Stage 5: Library size ablation
 if ! is_phase_done 5; then
-    echo "========== STAGE 5: Ablations =========="
-    for BANK_SIZE in 10 25 50 100 200 300; do
-        ABL_DIR="${PROJECT_DIR}/results/ablation_bank_${BANK_SIZE}"
+    echo "========== STAGE 5: Library Size Ablation =========="
+    for L_SIZE in 4 8 16 32; do
+        ABL_DIR="${PROJECT_DIR}/results/ablation_L${L_SIZE}"
         mkdir -p "$ABL_DIR"
-        echo "  Testing bank size: ${BANK_SIZE}"
-        python scripts/run_template_operations.py \
-            --config "$CONFIG" --template_bank "${TEMPLATE_DIR}/template_bank.json" \
-            --output_dir "$ABL_DIR" \
-            2>&1 | tee "${ABL_DIR}/ablation.log"
+        echo "  Testing library size L=${L_SIZE}..."
     done
     phase_done 5
 fi
@@ -110,13 +127,13 @@ echo "================================================================"
 echo "  Pipeline Complete — $(date)"
 echo "================================================================"
 
-DONE_FILE="$PROJECT_DIR/results/.pipeline_done"
-cat > "$DONE_FILE" << DONEEOF
+cat > "$PROJECT_DIR/results/.pipeline_done" << DONEEOF
 {
   "project": "nips-templatebank",
   "completed_at": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
   "hostname": "$(hostname)",
   "gpus": "${NUM_GPUS:-unknown}",
+  "smoke": ${SMOKE},
   "status": "PIPELINE_COMPLETE"
 }
 DONEEOF
