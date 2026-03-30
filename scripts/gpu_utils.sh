@@ -15,6 +15,14 @@ detect_gpus() {
         local IFS=','
         local -a gpu_arr=($CUDA_VISIBLE_DEVICES)
         export NUM_GPUS=${#gpu_arr[@]}
+    elif [ -n "${SENSECORE_ACCELERATE_DEVICE_COUNT:-}" ]; then
+        export NUM_GPUS="$SENSECORE_ACCELERATE_DEVICE_COUNT"
+        local gpu_ids=""
+        for ((i=0; i<NUM_GPUS; i++)); do
+            [ -n "$gpu_ids" ] && gpu_ids="${gpu_ids},"
+            gpu_ids="${gpu_ids}${i}"
+        done
+        export CUDA_VISIBLE_DEVICES="$gpu_ids"
     else
         export NUM_GPUS=$(nvidia-smi -L 2>/dev/null | wc -l)
         if [ "$NUM_GPUS" -eq 0 ]; then

@@ -24,7 +24,7 @@ is_phase_done() {
     return 1
 }
 
-CONFIG="${PROJECT_DIR}/configs/template_config.yaml"
+CONFIG="${CONFIG_OVERRIDE:-${PROJECT_DIR}/configs/template_config.yaml}"
 TEMPLATE_DIR="${PROJECT_DIR}/results/templates"
 PLANNER_DIR="${PROJECT_DIR}/results/planner"
 EVAL_DIR="${PROJECT_DIR}/results/eval"
@@ -82,6 +82,7 @@ if ! is_phase_done 3a; then
         --config "$CONFIG" --mode compose \
         --training_data "${TEMPLATE_DIR}/compose_train.json" \
         --output_dir "${PLANNER_DIR}/compose" \
+        --resume auto \
         2>&1 | tee "$LOG_DIR/stage3a_compose.log"
     phase_done 3a
 fi
@@ -93,6 +94,7 @@ if ! is_phase_done 3b; then
         --config "$CONFIG" --mode flat \
         --training_data "${TEMPLATE_DIR}/flat_train.json" \
         --output_dir "${PLANNER_DIR}/flat" \
+        --resume auto \
         2>&1 | tee "$LOG_DIR/stage3b_flat.log"
     phase_done 3b
 fi
