@@ -31,15 +31,15 @@
 
 ## Implemented Pilot (2026-02-27)
 - Script:
-  - `methods/06_templatebank_pp/scripts/run_templatebank_pilot.py`
+  - `scripts/run_templatebank_pilot.py`
 - Command:
   ```bash
-  python methods/06_templatebank_pp/scripts/run_templatebank_pilot.py
+  python scripts/run_templatebank_pilot.py
   ```
 - Input:
-  - `methods/01_adathink/results/per_sample_Qwen3_8B_20260227_140410.csv`
+  - `results/per_sample_input.csv`
 - Output:
-  - `methods/06_templatebank_pp/results/templatebank_pilot_20260227_150036.json`
+  - `results/pilot/templatebank_pilot_20260227_150036.json`
 
 ## Pilot Snapshot
 - Static memory:

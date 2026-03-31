@@ -146,7 +146,7 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    base_model = config["extraction"]["student_model"]
+    base_model = config["planner"]["model"]
     logger.info("Loading model: %s", base_model)
 
     tokenizer = AutoTokenizer.from_pretrained(base_model)
@@ -172,16 +172,15 @@ def main():
     all_results = {}
 
     # 1. Evaluate on test sets
-    for ds_cfg in config["evaluation"]["test_datasets"]:
-        name = ds_cfg["name"]
+    for name, ds_cfg in config["datasets"].items():
         logger.info("=== Evaluating on %s ===", name)
         try:
             subset = ds_cfg.get("subset")
             if subset:
-                ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["split"])
+                ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["test_split"])
             else:
-                ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["split"])
-            max_s = ds_cfg.get("max_samples", 1000)
+                ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["test_split"])
+            max_s = ds_cfg.get("max_test", 1000)
             if len(ds) > max_s:
                 ds = ds.shuffle(seed=42).select(range(max_s))
             result = evaluate_accuracy(model, tokenizer, ds, max_samples=max_s)

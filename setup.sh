@@ -7,7 +7,7 @@ echo "============================================"
 echo " Environment Setup (venv + pip + PyTorch 2.10 + CUDA 12.8)"
 echo "============================================"
 
-# --- Pick Python (prefer 3.12 > 3.11 > 3.10) ---
+# --- Pick Python (prefer 3.12 > 3.11 > 3.10; check PATH then conda) ---
 PYTHON_CMD=""
 for try in python3.12 python3.11 python3.10 python3; do
     if command -v "$try" &>/dev/null; then
@@ -15,11 +15,31 @@ for try in python3.12 python3.11 python3.10 python3; do
         break
     fi
 done
+if [ -z "$PYTHON_CMD" ] && [ -n "${CONDA_PREFIX:-}" ]; then
+    if [ -x "${CONDA_PREFIX}/bin/python3" ]; then
+        PYTHON_CMD="${CONDA_PREFIX}/bin/python3"
+    elif [ -x "${CONDA_PREFIX}/bin/python" ]; then
+        PYTHON_CMD="${CONDA_PREFIX}/bin/python"
+    fi
+fi
+if [ -z "$PYTHON_CMD" ] && command -v conda &>/dev/null; then
+    CONDA_BASE="$(conda info --base 2>/dev/null || true)"
+    if [ -n "$CONDA_BASE" ] && [ -x "${CONDA_BASE}/bin/python3" ]; then
+        PYTHON_CMD="${CONDA_BASE}/bin/python3"
+    fi
+fi
 if [ -z "$PYTHON_CMD" ]; then
-    echo "ERROR: Need python3.10+."
+    echo "ERROR: Need python3.10+. Install Python or activate a conda env with Python 3.10+."
     exit 1
 fi
-echo "[1/5] Using: $($PYTHON_CMD --version)"
+PY_VER="$("$PYTHON_CMD" -c "import sys; v=sys.version_info; print(f'{v.major}.{v.minor}')" 2>/dev/null || echo "0.0")"
+PY_MAJOR="${PY_VER%%.*}"
+PY_MINOR="${PY_VER##*.}"
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
+    echo "ERROR: Python >= 3.10 required, found $PY_VER ($PYTHON_CMD)"
+    exit 1
+fi
+echo "[1/5] Using: $($PYTHON_CMD --version) ($PYTHON_CMD)"
 
 # --- Create venv ---
 VENV_DIR="$PROJ_DIR/.venv"

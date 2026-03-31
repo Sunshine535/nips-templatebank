@@ -71,7 +71,7 @@ Rules:
 - Return ONLY valid JSON"""
 
 
-def load_datasets(config: dict) -> dict:
+def load_datasets(config: dict, allow_synthetic: bool = False) -> dict:
     all_data = {}
     for ds_key in ["gsm8k", "math"]:
         ds_cfg = config["datasets"][ds_key]
@@ -101,12 +101,22 @@ def load_datasets(config: dict) -> dict:
             all_data[ds_key] = items
             logger.info("  Loaded %d problems from %s", len(items), ds_key)
         except Exception as e:
+            if not allow_synthetic:
+                raise RuntimeError(
+                    f"Failed to load {ds_key}: {e}. Pass --allow_synthetic to use synthetic fallback."
+                ) from e
             logger.warning("Failed to load %s: %s — generating synthetic fallback", ds_key, e)
             all_data[ds_key] = _synthetic_fallback(ds_key, 500)
     return all_data
 
 
 def _synthetic_fallback(source: str, n: int) -> list:
+    logger.warning(
+        "SYNTHETIC DATA: Generating %d synthetic examples for '%s'. "
+        "These are NOT real math problems — results will be meaningless for research evaluation. "
+        "Pass real data or remove --allow_synthetic for production runs.",
+        n, source,
+    )
     items = []
     for i in range(n):
         a, b = (i * 7 + 3) % 100 + 1, (i * 11 + 5) % 100 + 1
@@ -115,6 +125,7 @@ def _synthetic_fallback(source: str, n: int) -> list:
             "solution": f"{a} + {b} = {a + b}",
             "answer": str(a + b),
             "source": source,
+            "is_synthetic": True,
         })
     return items
 
@@ -358,6 +369,7 @@ def main():
     parser.add_argument("--max_per_source", type=int, default=None)
     parser.add_argument("--use_student", action="store_true", help="Use student model (9B) instead of teacher (32B)")
     parser.add_argument("--synthetic", action="store_true", help="Use synthetic programs (for smoke testing)")
+    parser.add_argument("--allow_synthetic", action="store_true", help="Allow synthetic fallback when real data unavailable")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -368,7 +380,7 @@ def main():
     logger.info("  Stage 1: Extract Executable Programs")
     logger.info("=" * 60)
 
-    source_data = load_datasets(config)
+    source_data = load_datasets(config, allow_synthetic=args.allow_synthetic)
     if args.max_per_source:
         for k in source_data:
             source_data[k] = source_data[k][:args.max_per_source]
@@ -426,6 +438,22 @@ def main():
     logger.info("  Library: %d subroutines", library.size)
     logger.info("  Plans: %d", len(plans))
     logger.info("=" * 60)
+
+    synthetic_count = sum(1 for p in all_programs if p.get("source", "").startswith("synth") or any(
+        item.get("is_synthetic") for item in source_data.get(p.get("source", ""), []) if isinstance(item, dict)
+    ))
+    meta = {
+        "total_programs": len(all_programs),
+        "library_size": library.size,
+        "plans": len(plans),
+        "synthetic_used": args.synthetic or args.allow_synthetic,
+        "synthetic_flag": "--synthetic" in sys.argv or "--allow_synthetic" in sys.argv,
+    }
+    if args.synthetic:
+        meta["warning"] = "ALL programs are synthetic — not valid for research evaluation"
+    with open(os.path.join(args.output_dir, "extraction_meta.json"), "w") as f:
+        json.dump(meta, f, indent=2)
+    logger.info("Extraction metadata saved to %s/extraction_meta.json", args.output_dir)
 
 
 if __name__ == "__main__":

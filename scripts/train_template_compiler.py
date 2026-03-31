@@ -47,8 +47,12 @@ SYSTEM_PROMPTS = {
 }
 
 
-def load_training_data(data_path: str, mode: str) -> Dataset:
+def load_training_data(data_path: str, mode: str, allow_synthetic: bool = False) -> Dataset:
     if not os.path.exists(data_path):
+        if not allow_synthetic:
+            raise FileNotFoundError(
+                f"Training data not found: {data_path}. Pass --allow_synthetic to use synthetic fallback."
+            )
         logger.warning("Data not found at %s, generating synthetic", data_path)
         return _synthetic_data(mode)
 
@@ -107,6 +111,7 @@ def train(
     lora_cfg: dict,
     train_cfg: dict,
     resume: str = "auto",
+    allow_synthetic: bool = False,
 ):
     logger.info("=" * 60)
     logger.info("  Training mode=%s | model=%s", mode, model_name)
@@ -137,7 +142,7 @@ def train(
         bias="none",
     )
 
-    dataset = load_training_data(data_path, mode)
+    dataset = load_training_data(data_path, mode, allow_synthetic=allow_synthetic)
     max_seq = train_cfg.get("max_seq_length", 2048)
 
     sft_config = SFTConfig(
@@ -202,6 +207,7 @@ def main():
     parser.add_argument("--training_data", type=str, default=None)
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--resume", type=str, default="auto", help="auto / none / path")
+    parser.add_argument("--allow_synthetic", action="store_true", help="Allow synthetic fallback when real data unavailable")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--max_seq_length", type=int, default=None)
     args = parser.parse_args()
@@ -231,6 +237,7 @@ def main():
         lora_cfg=lora_cfg,
         train_cfg=train_cfg,
         resume=args.resume,
+        allow_synthetic=args.allow_synthetic,
     )
 
 

@@ -199,9 +199,14 @@ def eval_flat(model, tokenizer, dataset, max_samples, max_tokens) -> dict:
     }
 
 
-def eval_cot_budget(model, tokenizer, dataset, max_samples, max_tokens, n_samples=5) -> dict:
-    """Compute-matched CoT with majority vote."""
-    logger.info("  [cot_budget] Evaluating (n=%d)...", n_samples)
+def eval_cot_budget(model, tokenizer, dataset, max_samples, max_tokens, config_eval) -> dict:
+    """Compute-matched CoT with majority vote. Uses evaluation.cot_budget config."""
+    cot_cfg = config_eval.get("cot_budget", {})
+    n_samples = config_eval.get("rerank_n", 3)
+    temperature = cot_cfg.get("temperature", 0.6)
+    top_p = cot_cfg.get("top_p", 0.95)
+    vote_strategy = cot_cfg.get("vote", "majority_numeric")
+    logger.info("  [cot_budget] Evaluating (n=%d, temp=%.2f, top_p=%.2f)...", n_samples, temperature, top_p)
     correct, total, total_tokens = 0, 0, 0
     t0 = time.time()
 
@@ -220,7 +225,7 @@ def eval_cot_budget(model, tokenizer, dataset, max_samples, max_tokens, n_sample
             inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=2048).to(model.device)
             with torch.no_grad():
                 output = model.generate(**inputs, max_new_tokens=max_tokens, do_sample=True,
-                                        temperature=0.6, top_p=0.95)
+                                        temperature=temperature, top_p=top_p)
             response = tokenizer.decode(output[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
             total_tokens += output.shape[1] - inputs["input_ids"].shape[1]
             pred = extract_answer(response)
@@ -240,6 +245,9 @@ def eval_cot_budget(model, tokenizer, dataset, max_samples, max_tokens, n_sample
         "avg_tokens": round(total_tokens / max(total, 1), 1),
         "latency_seconds": round(elapsed, 1),
         "n_samples": n_samples,
+        "temperature": temperature,
+        "top_p": top_p,
+        "vote_strategy": vote_strategy,
         "correct": correct, "total": total,
     }
 
@@ -299,6 +307,110 @@ def _parse_program(response: str) -> Program | None:
         return None
 
 
+def eval_retrieval_compose(model, tokenizer, dataset, library, max_samples, max_tokens, config_eval) -> dict:
+    """Retrieval-conditioned planner: retrieve top-k subroutines, then compose.
+
+    Uses evaluation.retrieval config for dense_weight, bm25_weight, top_k_funcs.
+    Falls back to random-subset compose if sentence-transformers unavailable.
+    """
+    retr_cfg = config_eval.get("retrieval", {})
+    top_k_funcs = retr_cfg.get("top_k_funcs", 8)
+    logger.info("  [retrieval_compose] Evaluating (top_k_funcs=%d)...", top_k_funcs)
+
+    comp_exec = CompositionExecutor(library)
+    all_subs = list(library.subroutines.values())
+
+    encoder = None
+    try:
+        from sentence_transformers import SentenceTransformer
+        encoder_name = retr_cfg.get("encoder", "BAAI/bge-large-en-v1.5")
+        encoder = SentenceTransformer(encoder_name)
+        sub_texts = [f"{s.sub_id}: {' '.join(op.value for op in [st.op for st in s.program.steps])}" for s in all_subs]
+        sub_embeddings = encoder.encode(sub_texts, normalize_embeddings=True)
+        logger.info("  Loaded retrieval encoder: %s", encoder_name)
+    except ImportError:
+        logger.warning("  sentence-transformers not available; using random sub-selection fallback")
+        sub_embeddings = None
+
+    correct, total, valid_plans, exec_success, fallback_used, total_tokens = 0, 0, 0, 0, 0, 0
+    t0 = time.time()
+
+    for i, ex in enumerate(dataset):
+        if i >= max_samples:
+            break
+        question = ex.get("question", ex.get("problem", ""))
+        gold = str(ex.get("answer", ex.get("solution", "")))
+
+        if encoder is not None and sub_embeddings is not None:
+            import numpy as _np
+            q_emb = encoder.encode([question], normalize_embeddings=True)
+            scores = (q_emb @ sub_embeddings.T).flatten()
+            topk_idx = _np.argsort(-scores)[:top_k_funcs]
+            selected = [all_subs[j] for j in topk_idx]
+        else:
+            import random as _rng
+            _rng.seed(42 + i)
+            k = min(top_k_funcs, len(all_subs))
+            selected = _rng.sample(all_subs, k)
+
+        from src.template_dsl import SubroutineLibrary as _SL
+        sub_lib = _SL()
+        for s in selected:
+            sub_lib.add(s)
+        lib_sigs = "\n".join(sub_lib.signatures())
+
+        prompt = (
+            f"Available subroutines (retrieved):\n{lib_sigs}\n\n"
+            f"Problem: {question}\n\nGenerate a composition plan (JSON):"
+        )
+        response, tokens = generate(model, tokenizer, prompt, max_tokens)
+        total_tokens += tokens
+        total += 1
+
+        plan = _parse_plan(response)
+        if plan is None:
+            fallback_used += 1
+            cot_prompt = f"Solve step by step:\n\nProblem: {question}\n\nSolution:"
+            cot_resp, cot_tokens = generate(model, tokenizer, cot_prompt, max_tokens)
+            total_tokens += cot_tokens
+            pred = extract_answer(cot_resp)
+            if check_answer(pred, gold):
+                correct += 1
+            continue
+
+        valid_plans += 1
+        numbers = re.findall(r'[\d,]+\.?\d*', question)
+        bindings = {f"x{j}": float(n.replace(",", "")) for j, n in enumerate(numbers)}
+
+        success, result, stats = comp_exec.execute(plan, bindings)
+        if success and result is not None:
+            exec_success += 1
+            if check_answer(str(result), gold):
+                correct += 1
+        else:
+            fallback_used += 1
+            cot_prompt = f"Solve step by step:\n\nProblem: {question}\n\nSolution:"
+            cot_resp, cot_tokens = generate(model, tokenizer, cot_prompt, max_tokens)
+            total_tokens += cot_tokens
+            pred = extract_answer(cot_resp)
+            if check_answer(pred, gold):
+                correct += 1
+
+    elapsed = time.time() - t0
+    return {
+        "method": "retrieval_compose",
+        "accuracy": round(correct / max(total, 1), 4),
+        "valid_plan_rate": round(valid_plans / max(total, 1), 4),
+        "execution_success": round(exec_success / max(total, 1), 4),
+        "fallback_rate": round(fallback_used / max(total, 1), 4),
+        "fallback_free_accuracy": round((correct - fallback_used) / max(total - fallback_used, 1), 4) if total > fallback_used else 0.0,
+        "avg_tokens": round(total_tokens / max(total, 1), 1),
+        "latency_seconds": round(elapsed, 1),
+        "top_k_funcs": top_k_funcs,
+        "correct": correct, "total": total,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate subroutine composition vs baselines")
     parser.add_argument("--config", type=str, default=str(Path(__file__).resolve().parent.parent / "configs" / "template_config.yaml"))
@@ -310,6 +422,7 @@ def main():
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--skip_cot", action="store_true")
     parser.add_argument("--skip_flat", action="store_true")
+    parser.add_argument("--skip_retrieval", action="store_true")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -319,6 +432,7 @@ def main():
 
     base_model = config["planner"]["model"]
     max_tokens = 512
+    config_eval = config.get("evaluation", {})
 
     library = None
     if os.path.exists(args.library_path):
@@ -333,26 +447,47 @@ def main():
         "library_size": library.size if library else 0,
     }}
 
-    for ds_key in ["gsm8k", "math"]:
-        ds_cfg = config["datasets"][ds_key]
-        max_s = args.max_samples or ds_cfg.get("max_test", 500)
-        max_tok = ds_cfg.get("max_new_tokens_plan", max_tokens)
+    mcd_test_data = None
+    if args.split_path and os.path.exists(args.split_path):
+        mcd_split_data = load_split(args.split_path)
+        plans_path = os.path.join(os.path.dirname(args.library_path), "plans_with_programs.json")
+        if os.path.exists(plans_path):
+            with open(plans_path) as f:
+                all_plans = json.load(f)
+            test_indices = mcd_split_data.get("test", [])
+            mcd_test_data = [all_plans[i] for i in test_indices if i < len(all_plans)]
+            logger.info("Loaded MCD test split: %d examples", len(mcd_test_data))
+        else:
+            logger.warning("Plans file not found at %s, skipping MCD eval", plans_path)
+
+    eval_keys = ["gsm8k", "math"]
+    if mcd_test_data is not None:
+        eval_keys.append("mcd_test")
+
+    for ds_key in eval_keys:
+        if ds_key == "mcd_test":
+            ds = mcd_test_data
+            max_s = args.max_samples or len(ds)
+            max_tok = max_tokens
+        else:
+            ds_cfg = config["datasets"][ds_key]
+            max_s = args.max_samples or ds_cfg.get("max_test", 500)
+            max_tok = ds_cfg.get("max_new_tokens_plan", max_tokens)
+            try:
+                subset = ds_cfg.get("subset")
+                if subset:
+                    ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["test_split"])
+                else:
+                    ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["test_split"])
+                if len(ds) > max_s:
+                    ds = ds.shuffle(seed=args.seed).select(range(max_s))
+            except Exception as e:
+                logger.warning("Failed to load %s: %s", ds_key, e)
+                continue
 
         logger.info("=" * 60)
         logger.info("  Evaluating on %s (max %d)", ds_key, max_s)
         logger.info("=" * 60)
-
-        try:
-            subset = ds_cfg.get("subset")
-            if subset:
-                ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["test_split"])
-            else:
-                ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["test_split"])
-            if len(ds) > max_s:
-                ds = ds.shuffle(seed=args.seed).select(range(max_s))
-        except Exception as e:
-            logger.warning("Failed to load %s: %s", ds_key, e)
-            continue
 
         ds_results = {}
 
@@ -388,7 +523,27 @@ def main():
                 base_model, torch_dtype=torch.bfloat16, device_map="auto", trust_remote_code=True)
             base.eval()
             ds_results["direct_cot"] = eval_direct_cot(base, tokenizer, ds, max_s, max_tok)
+
+            # Method 4: CoT budget (majority vote, config-driven)
+            cot_max_tok = max_tok
+            if ds_key == "gsm8k":
+                cot_max_tok = config_eval.get("cot_budget", {}).get("max_new_tokens_gsm8k", max_tok)
+            elif ds_key == "math":
+                cot_max_tok = config_eval.get("cot_budget", {}).get("max_new_tokens_math", max_tok)
+            ds_results["cot_budget"] = eval_cot_budget(base, tokenizer, ds, max_s, cot_max_tok, config_eval)
             del base
+            torch.cuda.empty_cache()
+
+        # Method 5: Retrieval-conditioned compose
+        if library and not args.skip_retrieval:
+            retr_model = AutoModelForCausalLM.from_pretrained(
+                base_model, torch_dtype=torch.bfloat16, device_map="auto", trust_remote_code=True)
+            if os.path.exists(os.path.join(args.compose_dir, "adapter_config.json")):
+                retr_model = PeftModel.from_pretrained(retr_model, args.compose_dir)
+            retr_model.eval()
+            ds_results["retrieval_compose"] = eval_retrieval_compose(
+                retr_model, tokenizer, ds, library, max_s, max_tok, config_eval)
+            del retr_model
             torch.cuda.empty_cache()
 
         all_results[ds_key] = ds_results

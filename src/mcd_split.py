@@ -147,6 +147,9 @@ def build_mcd_split(
         test_compounds = [all_compounds[i] for i in test_idx]
         compound_div = compute_compound_divergence(train_compounds, test_compounds)
 
+        if compound_div < min_unseen_compounds:
+            continue
+
         if compound_div > best_score:
             best_score = compound_div
             best_split = {
@@ -160,9 +163,37 @@ def build_mcd_split(
                         trial, num_trials, best_score, atom_tvd)
 
     if best_split is None:
-        logger.warning("No split satisfies atom_tvd < %.3f after %d trials. "
-                       "Using best available split (relaxing constraint).",
-                       max_atom_tvd, num_trials)
+        logger.warning(
+            "No split satisfies atom_tvd < %.3f AND min_unseen_compounds >= %.3f "
+            "after %d trials. Relaxing min_unseen_compounds to find best available.",
+            max_atom_tvd, min_unseen_compounds, num_trials,
+        )
+        for trial in range(num_trials):
+            rng.shuffle(indices)
+            train_idx = indices[:n_train]
+            dev_idx = indices[n_train:n_train + n_dev]
+            test_idx = indices[n_train + n_dev:]
+
+            train_atoms = [all_atoms[i] for i in train_idx]
+            test_atoms = [all_atoms[i] for i in test_idx]
+            atom_tvd = compute_atom_tvd(train_atoms, test_atoms)
+            if atom_tvd > max_atom_tvd * 2:
+                continue
+
+            train_compounds = [all_compounds[i] for i in train_idx]
+            test_compounds = [all_compounds[i] for i in test_idx]
+            compound_div = compute_compound_divergence(train_compounds, test_compounds)
+
+            if compound_div > best_score:
+                best_score = compound_div
+                best_split = {
+                    "train": sorted(train_idx),
+                    "dev": sorted(dev_idx),
+                    "test": sorted(test_idx),
+                }
+
+    if best_split is None:
+        logger.warning("Fallback: random split (no constraint satisfied).")
         rng.shuffle(indices)
         best_split = {
             "train": sorted(indices[:n_train]),

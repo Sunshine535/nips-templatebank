@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 
 WORD_RE = re.compile(r"[a-zA-Z]+")
-DEFAULT_INPUT = "methods/01_adathink/results/per_sample_Qwen3_8B_20260227_140410.csv"
+DEFAULT_INPUT = "results/per_sample_input.csv"
 ACTIONS = [64, 128, 256]
 ANCHORS = [
     "each",
@@ -168,7 +168,7 @@ def fixed_metrics(rows, budget, lambda_cost):
 def main():
     ap = argparse.ArgumentParser(description="TemplateBank++ pilot with static/dynamic template memory")
     ap.add_argument("--input_csv", type=str, default=DEFAULT_INPUT)
-    ap.add_argument("--output_dir", type=str, default="methods/06_templatebank_pp/results")
+    ap.add_argument("--output_dir", type=str, default="results/pilot")
     ap.add_argument("--lambda_cost", type=float, default=0.15)
     args = ap.parse_args()
 

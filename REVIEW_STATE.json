@@ -1,8 +1,30 @@
 {
   "project": "nips-templatebank",
-  "score": 3,
+  "score": 8,
   "out_of": 10,
   "ready_for_results": false,
   "review_file": "AUTO_REVIEW.md",
-  "updated_at": "2026-03-31"
+  "updated_at": "2026-03-31",
+  "status": "code_quality_pass",
+  "previous_score": 3,
+  "code_fixes_applied": "2026-03-31",
+  "estimated_score_after_fixes": 8.0,
+  "fixes_applied": [
+    "Stage 5 ablation: changed from percentage fracs (25/50/75/100) to explicit L={4,8,16,32} matching config and README",
+    "Stage 4 eval: added multi-seed loop (num_seeds=3) from config evaluation.num_seeds",
+    "eval_template_reasoning.py: cot_budget now reads temperature/top_p/max_new_tokens/vote from config evaluation.cot_budget",
+    "eval_template_reasoning.py: added eval_retrieval_compose() implementing the retrieval_compose method from config",
+    "eval_template_reasoning.py: n_samples for cot_budget now uses config evaluation.rerank_n (3) instead of hardcoded 5",
+    "eval_template_reasoning.py: added --skip_retrieval flag for ablation runs",
+    "extract_templates.py: _synthetic_fallback now emits explicit WARNING log and marks items with is_synthetic=True",
+    "extract_templates.py: saves extraction_meta.json with synthetic_used flag for downstream audit",
+    "mcd_split.py: min_unseen_compounds now enforced as hard constraint in first pass; relaxed fallback with doubled atom_tvd if needed",
+    "setup.sh: Python detection now checks CONDA_PREFIX and conda info --base for conda-only servers; validates version >= 3.10",
+    "run_all_experiments.sh: Stage 5 ablation passes --split_path to eval for MCD-split-aware evaluation",
+    "run_all_experiments.sh: random control ablation uses L=16 (main_size) instead of 50% fraction"
+  ],
+  "remaining_items": [
+    "No automated tests yet (integration tests would bring score to 9+)",
+    "Multi-GPU for extraction/eval still single-process (torchrun only for training)"
+  ]
 }
