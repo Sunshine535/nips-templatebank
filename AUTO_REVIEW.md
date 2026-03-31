@@ -1,6 +1,37 @@
 # AUTO REVIEW
 
-**Date**: 2026-03-31
+## Round 2 — 2026-03-31
+
+**Reviewer**: ARIS Codex MCP
+**Previous Score**: 8/10
+**New Score**: 9/10
+
+### Fixes Applied
+
+1. **retrieval_compose evaluation bug** — `eval_retrieval_compose()` now creates a `CompositionExecutor(sub_lib)` from the retrieved sublibrary instead of executing against the full library. This ensures the planner's retrieval decision actually constrains execution.
+
+2. **fallback_free_accuracy computation** — Both `eval_compose()` and `eval_retrieval_compose()` now track `correct_no_fallback` separately (incremented only when execution succeeds and the answer is correct), instead of the incorrect formula `(correct - fallback_used)` which conflated fallback-correct with execution-correct.
+
+3. **Config-to-code contract**:
+   - `build_mcd_split.py` now accepts `--config` and reads `mcd_split` block (train/dev/test ratios, max_atom_tvd, min_unseen_test_compounds, num_trials) from config; CLI args override.
+   - `run_template_operations.py` no longer crashes when `evaluation.test_datasets` is missing.
+   - `run_all_experiments.sh` reads `NUM_SEEDS` from `evaluation.num_seeds` in config instead of hardcoding 3.
+
+4. **Reproducibility test suite** — Added `tests/test_templatebank.py` with 16 tests:
+   - Executor: simple add/mul, missing binding, multi-step, type coercion (5 tests)
+   - CompositionExecutor: single call, chained calls, unknown subroutine, initial bindings (4 tests)
+   - Library save/load: round-trip, execution after reload, JSON validity (3 tests)
+   - MCD split: index coverage, no overlap, stats present (3 tests)
+   - End-to-end smoke: full pipeline from library build to plan execution (1 test)
+
+### Remaining
+
+- Multi-GPU for extraction/eval is still single-process (`device_map="auto"`); only training uses `torchrun`.
+
+---
+
+## Round 1 — 2026-03-31
+
 **Reviewer**: Codex
 **Score**: 3/10
 

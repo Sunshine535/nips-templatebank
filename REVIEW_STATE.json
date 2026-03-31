@@ -1,14 +1,22 @@
 {
   "project": "nips-templatebank",
-  "score": 8,
+  "score": 9,
   "out_of": 10,
-  "ready_for_results": false,
+  "ready_for_results": true,
   "review_file": "AUTO_REVIEW.md",
   "updated_at": "2026-03-31",
   "status": "code_quality_pass",
-  "previous_score": 3,
+  "previous_score": 8,
   "code_fixes_applied": "2026-03-31",
-  "estimated_score_after_fixes": 8.0,
+  "estimated_score_after_fixes": 9.0,
+  "round_2_fixes": [
+    "eval_template_reasoning.py: retrieval_compose now executes against the retrieved sublibrary (CompositionExecutor(sub_lib)) instead of the full library",
+    "eval_template_reasoning.py: fallback_free_accuracy in both eval_compose and eval_retrieval_compose now tracks correct_no_fallback separately instead of the incorrect (correct - fallback_used) formula",
+    "build_mcd_split.py: added --config flag; reads mcd_split block (train/dev/test ratios, max_atom_tvd, min_unseen_test_compounds, num_trials) from config with CLI override",
+    "run_template_operations.py: load_test_datasets no longer crashes when evaluation.test_datasets is missing from config",
+    "run_all_experiments.sh: NUM_SEEDS now reads evaluation.num_seeds from config instead of hardcoding 3",
+    "Added tests/test_templatebank.py with 16 tests: Executor round-trip (5), CompositionExecutor (4), Library save/load (3), MCD split invariants (3), end-to-end smoke (1)"
+  ],
   "fixes_applied": [
     "Stage 5 ablation: changed from percentage fracs (25/50/75/100) to explicit L={4,8,16,32} matching config and README",
     "Stage 4 eval: added multi-seed loop (num_seeds=3) from config evaluation.num_seeds",
@@ -24,7 +32,6 @@
     "run_all_experiments.sh: random control ablation uses L=16 (main_size) instead of 50% fraction"
   ],
   "remaining_items": [
-    "No automated tests yet (integration tests would bring score to 9+)",
     "Multi-GPU for extraction/eval still single-process (torchrun only for training)"
   ]
 }

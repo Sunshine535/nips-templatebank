@@ -88,6 +88,7 @@ def eval_compose(model, tokenizer, dataset, library, max_samples, max_tokens) ->
     lib_sigs = "\n".join(library.signatures())
 
     correct, total, valid_plans, exec_success, fallback_used, total_tokens = 0, 0, 0, 0, 0, 0
+    correct_no_fallback = 0
     t0 = time.time()
 
     for i, ex in enumerate(dataset):
@@ -125,6 +126,7 @@ def eval_compose(model, tokenizer, dataset, library, max_samples, max_tokens) ->
             pred = str(result)
             if check_answer(pred, gold):
                 correct += 1
+                correct_no_fallback += 1
         else:
             fallback_used += 1
             cot_prompt = f"Solve step by step:\n\nProblem: {question}\n\nSolution:"
@@ -135,13 +137,14 @@ def eval_compose(model, tokenizer, dataset, library, max_samples, max_tokens) ->
                 correct += 1
 
     elapsed = time.time() - t0
+    non_fallback = total - fallback_used
     return {
         "method": "compose",
         "accuracy": round(correct / max(total, 1), 4),
         "valid_plan_rate": round(valid_plans / max(total, 1), 4),
         "execution_success": round(exec_success / max(total, 1), 4),
         "fallback_rate": round(fallback_used / max(total, 1), 4),
-        "fallback_free_accuracy": round((correct - fallback_used) / max(total - fallback_used, 1), 4) if total > fallback_used else 0.0,
+        "fallback_free_accuracy": round(correct_no_fallback / max(non_fallback, 1), 4) if non_fallback > 0 else 0.0,
         "avg_tokens": round(total_tokens / max(total, 1), 1),
         "latency_seconds": round(elapsed, 1),
         "correct": correct, "total": total,
@@ -312,12 +315,12 @@ def eval_retrieval_compose(model, tokenizer, dataset, library, max_samples, max_
 
     Uses evaluation.retrieval config for dense_weight, bm25_weight, top_k_funcs.
     Falls back to random-subset compose if sentence-transformers unavailable.
+    Execution uses ONLY the retrieved sublibrary, not the full library.
     """
     retr_cfg = config_eval.get("retrieval", {})
     top_k_funcs = retr_cfg.get("top_k_funcs", 8)
     logger.info("  [retrieval_compose] Evaluating (top_k_funcs=%d)...", top_k_funcs)
 
-    comp_exec = CompositionExecutor(library)
     all_subs = list(library.subroutines.values())
 
     encoder = None
@@ -333,6 +336,7 @@ def eval_retrieval_compose(model, tokenizer, dataset, library, max_samples, max_
         sub_embeddings = None
 
     correct, total, valid_plans, exec_success, fallback_used, total_tokens = 0, 0, 0, 0, 0, 0
+    correct_no_fallback = 0
     t0 = time.time()
 
     for i, ex in enumerate(dataset):
@@ -353,11 +357,11 @@ def eval_retrieval_compose(model, tokenizer, dataset, library, max_samples, max_
             k = min(top_k_funcs, len(all_subs))
             selected = _rng.sample(all_subs, k)
 
-        from src.template_dsl import SubroutineLibrary as _SL
-        sub_lib = _SL()
+        sub_lib = SubroutineLibrary()
         for s in selected:
             sub_lib.add(s)
         lib_sigs = "\n".join(sub_lib.signatures())
+        sub_exec = CompositionExecutor(sub_lib)
 
         prompt = (
             f"Available subroutines (retrieved):\n{lib_sigs}\n\n"
@@ -382,11 +386,12 @@ def eval_retrieval_compose(model, tokenizer, dataset, library, max_samples, max_
         numbers = re.findall(r'[\d,]+\.?\d*', question)
         bindings = {f"x{j}": float(n.replace(",", "")) for j, n in enumerate(numbers)}
 
-        success, result, stats = comp_exec.execute(plan, bindings)
+        success, result, stats = sub_exec.execute(plan, bindings)
         if success and result is not None:
             exec_success += 1
             if check_answer(str(result), gold):
                 correct += 1
+                correct_no_fallback += 1
         else:
             fallback_used += 1
             cot_prompt = f"Solve step by step:\n\nProblem: {question}\n\nSolution:"
@@ -397,13 +402,14 @@ def eval_retrieval_compose(model, tokenizer, dataset, library, max_samples, max_
                 correct += 1
 
     elapsed = time.time() - t0
+    non_fallback = total - fallback_used
     return {
         "method": "retrieval_compose",
         "accuracy": round(correct / max(total, 1), 4),
         "valid_plan_rate": round(valid_plans / max(total, 1), 4),
         "execution_success": round(exec_success / max(total, 1), 4),
         "fallback_rate": round(fallback_used / max(total, 1), 4),
-        "fallback_free_accuracy": round((correct - fallback_used) / max(total - fallback_used, 1), 4) if total > fallback_used else 0.0,
+        "fallback_free_accuracy": round(correct_no_fallback / max(non_fallback, 1), 4) if non_fallback > 0 else 0.0,
         "avg_tokens": round(total_tokens / max(total, 1), 1),
         "latency_seconds": round(elapsed, 1),
         "top_k_funcs": top_k_funcs,

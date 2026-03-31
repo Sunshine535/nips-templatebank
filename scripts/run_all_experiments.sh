@@ -107,7 +107,8 @@ fi
 
 # Stage 4: Full evaluation (multi-seed from config: evaluation.num_seeds)
 EVAL_MAX="${EVAL_MAX_SAMPLES:-500}"
-NUM_SEEDS="${NUM_SEEDS:-3}"
+CONFIG_NUM_SEEDS=$(python3 -c "import yaml; c=yaml.safe_load(open('${CONFIG}')); print(c.get('evaluation',{}).get('num_seeds',3))" 2>/dev/null || echo 3)
+NUM_SEEDS="${NUM_SEEDS:-$CONFIG_NUM_SEEDS}"
 if ! is_phase_done 4; then
     echo "========== STAGE 4: Evaluation (max=${EVAL_MAX}, seeds=${NUM_SEEDS}) =========="
     for SEED in $(seq 1 "$NUM_SEEDS"); do

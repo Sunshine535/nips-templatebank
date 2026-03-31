@@ -42,7 +42,12 @@ logger = logging.getLogger(__name__)
 def load_test_datasets(config: dict) -> dict:
     """Load test sets for coverage evaluation."""
     datasets = {}
-    for ds_cfg in config["evaluation"]["test_datasets"]:
+    eval_cfg = config.get("evaluation", {})
+    test_ds_list = eval_cfg.get("test_datasets")
+    if not test_ds_list:
+        logger.warning("No evaluation.test_datasets in config; skipping coverage datasets")
+        return datasets
+    for ds_cfg in test_ds_list:
         name = ds_cfg["name"]
         try:
             subset = ds_cfg.get("subset")
