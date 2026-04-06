@@ -157,14 +157,13 @@ def train(
         logging_steps=train_cfg["logging_steps"],
         save_steps=train_cfg["save_steps"],
         save_total_limit=train_cfg.get("save_total_limit", 3),
-        max_seq_length=max_seq,
+        max_length=max_seq,
         gradient_checkpointing=train_cfg["gradient_checkpointing"],
         gradient_checkpointing_kwargs={"use_reentrant": False},
         dataloader_num_workers=train_cfg["dataloader_num_workers"],
         remove_unused_columns=False,
         report_to=train_cfg.get("report_to", "wandb"),
         ddp_find_unused_parameters=False,
-        dataset_text_field="text",
     )
 
     trainer = SFTTrainer(

@@ -72,7 +72,7 @@ def check_answer(pred: str | None, gold: str) -> bool:
 
 def generate(model, tokenizer, prompt: str, max_new_tokens: int = 512) -> tuple[str, int]:
     messages = [{"role": "user", "content": prompt}]
-    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=3072).to(model.device)
     with torch.no_grad():
         output = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
@@ -89,6 +89,7 @@ def eval_compose(model, tokenizer, dataset, library, max_samples, max_tokens) ->
 
     correct, total, valid_plans, exec_success, fallback_used, total_tokens = 0, 0, 0, 0, 0, 0
     correct_no_fallback = 0
+    valid_json_count = 0
     t0 = time.time()
 
     for i, ex in enumerate(dataset):
@@ -105,6 +106,18 @@ def eval_compose(model, tokenizer, dataset, library, max_samples, max_tokens) ->
         total_tokens += tokens
         total += 1
 
+        # Waterfall: check JSON parse separately from plan parse
+        json_match = re.search(r'\{[\s\S]*\}', response)
+        is_valid_json = False
+        if json_match:
+            try:
+                json.loads(json_match.group())
+                is_valid_json = True
+            except json.JSONDecodeError:
+                pass
+        if is_valid_json:
+            valid_json_count += 1
+
         plan = _parse_plan(response)
         if plan is None:
             fallback_used += 1
@@ -118,7 +131,7 @@ def eval_compose(model, tokenizer, dataset, library, max_samples, max_tokens) ->
 
         valid_plans += 1
         numbers = re.findall(r'[\d,]+\.?\d*', question)
-        bindings = {f"x{j}": float(n.replace(",", "")) for j, n in enumerate(numbers)}
+        bindings = {f"x{j}": (float(n.replace(",", "").strip()) if n.replace(",", "").strip() else 0) for j, n in enumerate(numbers)}
 
         success, result, stats = comp_exec.execute(plan, bindings)
         if success and result is not None:
@@ -148,6 +161,13 @@ def eval_compose(model, tokenizer, dataset, library, max_samples, max_tokens) ->
         "avg_tokens": round(total_tokens / max(total, 1), 1),
         "latency_seconds": round(elapsed, 1),
         "correct": correct, "total": total,
+        "waterfall": {
+            "total": total,
+            "valid_json": valid_json_count,
+            "valid_plan": valid_plans,
+            "executable": exec_success,
+            "answer_correct": correct_no_fallback,
+        },
     }
 
 
@@ -155,7 +175,9 @@ def eval_flat(model, tokenizer, dataset, max_samples, max_tokens) -> dict:
     """Evaluate flat-program baseline: same DSL, no library calls."""
     logger.info("  [flat_inline] Evaluating...")
     executor = Executor()
-    correct, total, valid_programs, exec_success, total_tokens = 0, 0, 0, 0, 0
+    correct, total, valid_programs, exec_success, fallback_used, total_tokens = 0, 0, 0, 0, 0, 0
+    correct_no_fallback = 0
+    valid_json_count = 0
     t0 = time.time()
 
     for i, ex in enumerate(dataset):
@@ -169,8 +191,27 @@ def eval_flat(model, tokenizer, dataset, max_samples, max_tokens) -> dict:
         total_tokens += tokens
         total += 1
 
+        # Waterfall: check JSON parse separately from program parse
+        json_match = re.search(r'\{[\s\S]*\}', response)
+        is_valid_json = False
+        if json_match:
+            try:
+                json.loads(json_match.group())
+                is_valid_json = True
+            except json.JSONDecodeError:
+                pass
+        if is_valid_json:
+            valid_json_count += 1
+
         program = _parse_program(response)
         if program is None:
+            fallback_used += 1
+            cot_prompt = f"Solve step by step:\n\nProblem: {question}\n\nSolution:"
+            cot_resp, cot_tokens = generate(model, tokenizer, cot_prompt, max_tokens)
+            total_tokens += cot_tokens
+            pred = extract_answer(cot_resp)
+            if check_answer(pred, gold):
+                correct += 1
             continue
 
         valid_programs += 1
@@ -178,7 +219,11 @@ def eval_flat(model, tokenizer, dataset, max_samples, max_tokens) -> dict:
         bindings = {}
         for j, slot in enumerate(program.slots):
             if j < len(numbers):
-                bindings[slot.name] = float(numbers[j].replace(",", ""))
+                cleaned = numbers[j].replace(",", "").strip()
+                try:
+                    bindings[slot.name] = float(cleaned) if cleaned else 0
+                except ValueError:
+                    bindings[slot.name] = 0
             else:
                 bindings[slot.name] = 0
 
@@ -187,18 +232,35 @@ def eval_flat(model, tokenizer, dataset, max_samples, max_tokens) -> dict:
             exec_success += 1
             if check_answer(str(result), gold):
                 correct += 1
+                correct_no_fallback += 1
+        else:
+            fallback_used += 1
+            cot_prompt = f"Solve step by step:\n\nProblem: {question}\n\nSolution:"
+            cot_resp, cot_tokens = generate(model, tokenizer, cot_prompt, max_tokens)
+            total_tokens += cot_tokens
+            pred = extract_answer(cot_resp)
+            if check_answer(pred, gold):
+                correct += 1
 
     elapsed = time.time() - t0
+    non_fallback = total - fallback_used
     return {
         "method": "flat_inline",
         "accuracy": round(correct / max(total, 1), 4),
         "valid_plan_rate": round(valid_programs / max(total, 1), 4),
         "execution_success": round(exec_success / max(total, 1), 4),
-        "fallback_rate": 0.0,
-        "fallback_free_accuracy": round(correct / max(total, 1), 4),
+        "fallback_rate": round(fallback_used / max(total, 1), 4),
+        "fallback_free_accuracy": round(correct_no_fallback / max(non_fallback, 1), 4) if non_fallback > 0 else 0.0,
         "avg_tokens": round(total_tokens / max(total, 1), 1),
         "latency_seconds": round(elapsed, 1),
         "correct": correct, "total": total,
+        "waterfall": {
+            "total": total,
+            "valid_json": valid_json_count,
+            "valid_program": valid_programs,
+            "executable": exec_success,
+            "answer_correct": correct_no_fallback,
+        },
     }
 
 
@@ -224,7 +286,7 @@ def eval_cot_budget(model, tokenizer, dataset, max_samples, max_tokens, config_e
         answers = []
         for _ in range(n_samples):
             messages = [{"role": "user", "content": prompt}]
-            text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
             inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=2048).to(model.device)
             with torch.no_grad():
                 output = model.generate(**inputs, max_new_tokens=max_tokens, do_sample=True,
@@ -384,7 +446,7 @@ def eval_retrieval_compose(model, tokenizer, dataset, library, max_samples, max_
 
         valid_plans += 1
         numbers = re.findall(r'[\d,]+\.?\d*', question)
-        bindings = {f"x{j}": float(n.replace(",", "")) for j, n in enumerate(numbers)}
+        bindings = {f"x{j}": (float(n.replace(",", "").strip()) if n.replace(",", "").strip() else 0) for j, n in enumerate(numbers)}
 
         success, result, stats = sub_exec.execute(plan, bindings)
         if success and result is not None:
@@ -417,18 +479,103 @@ def eval_retrieval_compose(model, tokenizer, dataset, library, max_samples, max_
     }
 
 
+def run_binding_analysis(model, tokenizer, dataset, library, max_samples, max_tokens,
+                         perturb_frac: float = 0.10, subset: int = 200) -> dict:
+    """Binding sensitivity analysis: perturb each binding +/-10% and check if answer changes.
+
+    Decomposes compose errors into: planner failures, binding failures (decorative
+    bindings), and execution failures.  Reports % of active vs decorative bindings.
+    """
+    logger.info("  [binding_analysis] Running on %d examples (perturb=%.0f%%)...", subset, perturb_frac * 100)
+    comp_exec = CompositionExecutor(library)
+    lib_sigs = "\n".join(library.signatures())
+
+    total_bindings, active_bindings = 0, 0
+    planner_fail, exec_fail, answer_ok = 0, 0, 0
+    analyzed = 0
+
+    for i, ex in enumerate(dataset):
+        if analyzed >= subset or i >= max_samples:
+            break
+        question = ex.get("question", ex.get("problem", ""))
+        gold = str(ex.get("answer", ex.get("solution", "")))
+
+        prompt = (
+            f"Available subroutines:\n{lib_sigs}\n\n"
+            f"Problem: {question}\n\nGenerate a composition plan (JSON):"
+        )
+        response, _ = generate(model, tokenizer, prompt, max_tokens)
+        plan = _parse_plan(response)
+        if plan is None:
+            planner_fail += 1
+            analyzed += 1
+            continue
+
+        numbers = re.findall(r'[\d,]+\.?\d*', question)
+        bindings = {f"x{j}": (float(n.replace(",", "").strip()) if n.replace(",", "").strip() else 0) for j, n in enumerate(numbers)}
+        success, base_result, _ = comp_exec.execute(plan, bindings)
+        if not success or base_result is None:
+            exec_fail += 1
+            analyzed += 1
+            continue
+
+        if not check_answer(str(base_result), gold):
+            analyzed += 1
+            continue
+
+        # This example succeeded — now perturb each binding
+        answer_ok += 1
+        for key, val in bindings.items():
+            if val == 0:
+                total_bindings += 1
+                continue  # can't meaningfully perturb zero
+            total_bindings += 1
+            perturbed = dict(bindings)
+            perturbed[key] = val * (1 + perturb_frac)
+            ok_up, res_up, _ = comp_exec.execute(plan, perturbed)
+            perturbed[key] = val * (1 - perturb_frac)
+            ok_dn, res_dn, _ = comp_exec.execute(plan, perturbed)
+            # Binding is "active" if perturbing it changes the output
+            if (ok_up and res_up is not None and abs(float(res_up) - float(base_result)) > 1e-6) or \
+               (ok_dn and res_dn is not None and abs(float(res_dn) - float(base_result)) > 1e-6):
+                active_bindings += 1
+        analyzed += 1
+
+    active_pct = round(active_bindings / max(total_bindings, 1), 4)
+    decorative_pct = round(1 - active_pct, 4)
+    result = {
+        "analyzed": analyzed,
+        "planner_failures": planner_fail,
+        "execution_failures": exec_fail,
+        "correct_examples_probed": answer_ok,
+        "total_bindings_probed": total_bindings,
+        "active_bindings": active_bindings,
+        "active_pct": active_pct,
+        "decorative_pct": decorative_pct,
+        "perturb_frac": perturb_frac,
+    }
+    logger.info("  [binding_analysis] active=%.1f%% decorative=%.1f%% (planner_fail=%d exec_fail=%d probed=%d)",
+                active_pct * 100, decorative_pct * 100, planner_fail, exec_fail, answer_ok)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate subroutine composition vs baselines")
     parser.add_argument("--config", type=str, default=str(Path(__file__).resolve().parent.parent / "configs" / "template_config.yaml"))
     parser.add_argument("--compose_dir", type=str, default="results/planner/compose")
     parser.add_argument("--flat_dir", type=str, default="results/planner/flat")
     parser.add_argument("--library_path", type=str, default="results/templates/subroutine_library.json")
+    parser.add_argument("--programs_path", type=str, default="results/templates/all_programs.json")
     parser.add_argument("--split_path", type=str, default=None)
     parser.add_argument("--output_dir", type=str, default="results/eval")
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--skip_cot", action="store_true")
     parser.add_argument("--skip_flat", action="store_true")
     parser.add_argument("--skip_retrieval", action="store_true")
+    parser.add_argument("--binding_analysis", action="store_true",
+                        help="Run binding sensitivity analysis on compose examples")
+    parser.add_argument("--binding_subset", type=int, default=200,
+                        help="Number of examples for binding analysis")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -456,15 +603,14 @@ def main():
     mcd_test_data = None
     if args.split_path and os.path.exists(args.split_path):
         mcd_split_data = load_split(args.split_path)
-        plans_path = os.path.join(os.path.dirname(args.library_path), "plans_with_programs.json")
-        if os.path.exists(plans_path):
-            with open(plans_path) as f:
-                all_plans = json.load(f)
+        if os.path.exists(args.programs_path):
+            with open(args.programs_path) as f:
+                all_programs = json.load(f)
             test_indices = mcd_split_data.get("test", [])
-            mcd_test_data = [all_plans[i] for i in test_indices if i < len(all_plans)]
-            logger.info("Loaded MCD test split: %d examples", len(mcd_test_data))
+            mcd_test_data = [all_programs[i] for i in test_indices if i < len(all_programs)]
+            logger.info("Loaded MCD test split: %d examples from %s", len(mcd_test_data), args.programs_path)
         else:
-            logger.warning("Plans file not found at %s, skipping MCD eval", plans_path)
+            logger.warning("Programs file not found at %s, skipping MCD eval", args.programs_path)
 
     eval_keys = ["gsm8k", "math"]
     if mcd_test_data is not None:
@@ -552,6 +698,19 @@ def main():
             del retr_model
             torch.cuda.empty_cache()
 
+        # Optional: binding sensitivity analysis
+        if args.binding_analysis and library:
+            ba_model = AutoModelForCausalLM.from_pretrained(
+                base_model, torch_dtype=torch.bfloat16, device_map="auto", trust_remote_code=True)
+            if os.path.exists(os.path.join(args.compose_dir, "adapter_config.json")):
+                ba_model = PeftModel.from_pretrained(ba_model, args.compose_dir)
+            ba_model.eval()
+            ds_results["binding_analysis"] = run_binding_analysis(
+                ba_model, tokenizer, ds, library, max_s, max_tok,
+                subset=args.binding_subset)
+            del ba_model
+            torch.cuda.empty_cache()
+
         all_results[ds_key] = ds_results
 
     if library:
@@ -572,8 +731,9 @@ def main():
             for method, metrics in data.items():
                 if isinstance(metrics, dict) and "accuracy" in metrics:
                     fb = metrics.get("fallback_free_accuracy", metrics["accuracy"])
-                    logger.info("  %s / %s: acc=%.4f  fb_free=%.4f  tokens=%.1f",
-                                section, method, metrics["accuracy"], fb,
+                    fb_rate = metrics.get("fallback_rate", 0.0)
+                    logger.info("  %s / %s: fb_free_acc=%.4f  acc=%.4f  fb_rate=%.4f  tokens=%.1f",
+                                section, method, fb, metrics["accuracy"], fb_rate,
                                 metrics.get("avg_tokens", 0))
     logger.info("  Results: %s", results_path)
     logger.info("=" * 60)

@@ -25,11 +25,12 @@ from pathlib import Path
 
 import torch
 import yaml
-from datasets import load_dataset
+from datasets import concatenate_datasets, load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.template_dsl import (
+    CompositionExecutor,
     CompositionPlan,
     DType,
     Executor,
@@ -39,6 +40,7 @@ from src.template_dsl import (
     Step,
     Subroutine,
     SubroutineLibrary,
+    inline_program,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -77,8 +79,12 @@ def load_datasets(config: dict, allow_synthetic: bool = False) -> dict:
         ds_cfg = config["datasets"][ds_key]
         logger.info("Loading %s...", ds_key)
         try:
+            subsets = ds_cfg.get("subsets")
             subset = ds_cfg.get("subset")
-            if subset:
+            if subsets:
+                parts = [load_dataset(ds_cfg["dataset_id"], s, split=ds_cfg["train_split"]) for s in subsets]
+                ds = concatenate_datasets(parts)
+            elif subset:
                 ds = load_dataset(ds_cfg["dataset_id"], subset, split=ds_cfg["train_split"])
             else:
                 ds = load_dataset(ds_cfg["dataset_id"], split=ds_cfg["train_split"])
@@ -93,6 +99,9 @@ def load_datasets(config: dict, allow_synthetic: bool = False) -> dict:
                 answer = ""
                 if "####" in str(solution):
                     answer = str(solution).split("####")[-1].strip()
+                elif ds_key == "math":
+                    boxed = re.findall(r"\\boxed\{([^}]*)\}", str(solution))
+                    answer = boxed[-1].strip() if boxed else ""
                 elif solution:
                     nums = re.findall(r"[\-\d,]+\.?\d*", str(solution))
                     answer = nums[-1].replace(",", "") if nums else ""
@@ -130,12 +139,29 @@ def _synthetic_fallback(source: str, n: int) -> list:
     return items
 
 
+def _answer_matches(exec_result, gold_answer: str, tol: float = 1e-3) -> bool:
+    """Check if execution result matches the gold answer within tolerance."""
+    if gold_answer is None or gold_answer.strip() == "":
+        return False
+    try:
+        exec_val = float(str(exec_result).replace(",", ""))
+        gold_val = float(str(gold_answer).replace(",", ""))
+        if gold_val == 0:
+            return abs(exec_val) < tol
+        return abs(exec_val - gold_val) / max(abs(gold_val), 1e-12) < tol
+    except (ValueError, TypeError):
+        return str(exec_result).strip() == str(gold_answer).strip()
+
+
 def generate_programs(data: list, model, tokenizer, config: dict, source: str) -> list:
-    """Generate executable JSON-AST programs from problems."""
+    """Generate K candidate programs per problem, keep shortest answer-correct one."""
     max_new_tokens = config["teacher"]["max_new_tokens"]
+    k_samples = config["teacher"].get("samples_per_example", 4)
+    temperature = config["teacher"].get("temperature", 0.7)
+    top_p = config["teacher"].get("top_p", 0.95)
     executor = Executor()
     results = []
-    parse_ok, exec_ok, total = 0, 0, 0
+    parse_ok, exec_ok, correct_ok, total = 0, 0, 0, 0
 
     for i, item in enumerate(data):
         total += 1
@@ -146,35 +172,70 @@ def generate_programs(data: list, model, tokenizer, config: dict, source: str) -
             idx=i,
         )
         messages = [{"role": "user", "content": prompt}]
-        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
         inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=2048).to(model.device)
 
-        with torch.no_grad():
-            output = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
-        response = tokenizer.decode(output[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+        # Generate K candidates: first greedy, rest sampled
+        candidates = []
+        for k in range(k_samples):
+            with torch.no_grad():
+                if k == 0:
+                    output = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+                else:
+                    output = model.generate(
+                        **inputs, max_new_tokens=max_new_tokens,
+                        do_sample=True, temperature=temperature, top_p=top_p,
+                    )
+            response = tokenizer.decode(output[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+            program = _parse_program(response, f"{source}_p{i}_k{k}")
+            if program is not None:
+                candidates.append(program)
 
-        program = _parse_program(response, f"{source}_p{i}")
-        if program is None:
+        if not candidates:
             continue
         parse_ok += 1
 
-        bindings = _extract_bindings(item, program)
-        success, result, env = executor.execute(program, bindings)
-        if success and result is not None:
+        # Execute all candidates and keep answer-correct ones
+        correct_candidates = []
+        any_exec = False
+        for prog in candidates:
+            bindings = _extract_bindings(item, prog)
+            success, result, env = executor.execute(prog, bindings)
+            if success and result is not None:
+                any_exec = True
+                if _answer_matches(result, item["answer"]):
+                    correct_candidates.append((prog, bindings, result))
+        if any_exec:
             exec_ok += 1
-            results.append({
-                "problem": item["problem"],
-                "answer": item["answer"],
-                "source": source,
-                "program": program.to_dict(),
-                "bindings": bindings,
-                "exec_result": result,
-            })
+
+        if not correct_candidates:
+            continue
+        correct_ok += 1
+
+        # Select shortest correct program
+        best_prog, best_bindings, best_result = min(
+            correct_candidates, key=lambda x: len(x[0].steps)
+        )
+        best_prog.program_id = f"{source}_p{i}"
+        results.append({
+            "problem": item["problem"],
+            "answer": item["answer"],
+            "source": source,
+            "program": best_prog.to_dict(),
+            "bindings": best_bindings,
+            "exec_result": best_result,
+        })
 
         if (i + 1) % 100 == 0:
-            logger.info("  [%s] %d/%d: parsed=%d, executable=%d", source, i + 1, len(data), parse_ok, exec_ok)
+            logger.info(
+                "  [%s] %d/%d: parsed=%d, executable=%d, correct=%d",
+                source, i + 1, len(data), parse_ok, exec_ok, correct_ok,
+            )
 
-    logger.info("[%s] Done: %d/%d parsed, %d/%d executable", source, parse_ok, total, exec_ok, total)
+    logger.info(
+        "[%s] Done: %d/%d parsed, %d/%d executable, %d/%d answer-correct",
+        source, parse_ok, total, exec_ok, total, correct_ok, total,
+    )
     return results
 
 
@@ -200,12 +261,34 @@ def _extract_bindings(item: dict, program: Program) -> dict:
     for j, slot in enumerate(slot_list):
         if j < len(numbers):
             try:
-                bindings[slot.name] = DType.coerce(numbers[j], slot.dtype)
-            except TypeError:
-                bindings[slot.name] = float(numbers[j]) if "." in numbers[j] else int(numbers[j])
+                cleaned = numbers[j].replace(",", "").strip()
+                if not cleaned:
+                    bindings[slot.name] = 0
+                else:
+                    bindings[slot.name] = DType.coerce(cleaned, slot.dtype)
+            except (TypeError, ValueError):
+                try:
+                    cleaned = numbers[j].replace(",", "").strip()
+                    bindings[slot.name] = float(cleaned) if cleaned and "." in cleaned else int(cleaned) if cleaned else 0
+                except (ValueError, TypeError):
+                    bindings[slot.name] = 0
         else:
             bindings[slot.name] = 0
     return bindings
+
+
+def _step_signature(step) -> str:
+    """Build expression-level signature for a step."""
+    ops_in_expr = set()
+    for op_str in ['+', '-', '*', '/', '**', 'min(', 'max(', 'abs(', 'round(', 'sum(', 'len(', 'sqrt(', 'ceil(', 'floor(']:
+        if op_str in step.expr:
+            ops_in_expr.add(op_str.rstrip('('))
+    return f"{step.op.value}:{'|'.join(sorted(ops_in_expr))}"
+
+
+def _program_signature(steps) -> tuple:
+    """Build expression-level signature for a sequence of steps."""
+    return tuple(_step_signature(s) for s in steps)
 
 
 def build_subroutine_library(programs: list, config: dict) -> SubroutineLibrary:
@@ -214,11 +297,18 @@ def build_subroutine_library(programs: list, config: dict) -> SubroutineLibrary:
     lib_cfg = config["library"]
     target_size = lib_cfg["main_size"]
 
+    min_support_gsm8k = lib_cfg.get("min_support_gsm8k", 5)
+    min_support_math = lib_cfg.get("min_support_math", min_support_gsm8k)
+
+    # Group programs by expression-level signature (richer than just op type)
+    # This captures the arithmetic operators used in each step, not just "compute"
     fp_groups = defaultdict(list)
+    source_groups = defaultdict(lambda: defaultdict(int))
     for item in programs:
         prog = Program.from_dict(item["program"])
-        steps_sig = tuple(s.op.value for s in prog.steps)
+        steps_sig = _program_signature(prog.steps)
         fp_groups[steps_sig].append(prog)
+        source_groups[steps_sig][item.get("source", "gsm8k")] += 1
 
     sorted_groups = sorted(fp_groups.items(), key=lambda x: len(x[1]), reverse=True)
 
@@ -226,7 +316,11 @@ def build_subroutine_library(programs: list, config: dict) -> SubroutineLibrary:
     for sig, progs in sorted_groups:
         if lib.size >= target_size:
             break
-        if len(progs) < lib_cfg.get("min_support_gsm8k", 5):
+        # Apply source-appropriate min_support threshold
+        src_counts = source_groups[sig]
+        primary_source = max(src_counts, key=src_counts.get) if src_counts else "gsm8k"
+        min_support = min_support_math if primary_source == "math" else min_support_gsm8k
+        if len(progs) < min_support:
             continue
 
         representative = progs[0]
@@ -245,40 +339,56 @@ def build_subroutine_library(programs: list, config: dict) -> SubroutineLibrary:
 
 
 def build_composition_plans(programs: list, library: SubroutineLibrary) -> list:
-    """Map each program to a composition plan using library subroutines."""
+    """Decompose each program into multi-call composition plans via greedy covering."""
     plans = []
+    call_counts = []
     for item in programs:
         prog = Program.from_dict(item["program"])
-        steps_sig = tuple(s.op.value for s in prog.steps)
-
-        best_sub = None
-        for sub in library.subroutines.values():
-            sub_sig = tuple(s.op.value for s in sub.program.steps)
-            if sub_sig == steps_sig:
-                best_sub = sub
-                break
-
-        if best_sub is None:
+        steps = prog.steps
+        calls = []
+        i = 0
+        while i < len(steps):
+            best_sub, best_len = None, 0
             for sub in library.subroutines.values():
-                sub_sig = tuple(s.op.value for s in sub.program.steps)
-                if len(sub_sig) <= len(steps_sig):
-                    best_sub = sub
-                    break
+                sub_steps = sub.program.steps
+                sub_len = len(sub_steps)
+                if i + sub_len <= len(steps):
+                    # Match by op-type signature (structural, not expression-level)
+                    # The planner learns to map problems to subroutines;
+                    # expression differences are handled by slot bindings
+                    prog_ops = tuple(s.op.value for s in steps[i:i + sub_len])
+                    sub_ops = tuple(s.op.value for s in sub_steps)
+                    if prog_ops == sub_ops and sub_len > best_len:
+                        best_sub = sub
+                        best_len = sub_len
+            if best_sub is not None:
+                # Extract bindings for this call from the program's slots
+                call_bindings = {}
+                for slot in best_sub.program.slots:
+                    if slot.name in item.get("bindings", {}):
+                        call_bindings[slot.name] = item["bindings"][slot.name]
+                calls.append({"sub_id": best_sub.sub_id, "bindings": call_bindings})
+                i += best_len
+            else:
+                i += 1  # skip unmatched step
 
-        if best_sub is None:
-            best_sub = list(library.subroutines.values())[0]
+        if not calls:
+            # Fallback: use first subroutine
+            first_sub = list(library.subroutines.values())[0]
+            calls = [{"sub_id": first_sub.sub_id, "bindings": item.get("bindings", {})}]
 
-        plan = CompositionPlan(calls=[{
-            "sub_id": best_sub.sub_id,
-            "bindings": item.get("bindings", {}),
-        }])
+        plan = CompositionPlan(calls=calls)
+        call_counts.append(len(calls))
+        plans.append({**item, "plan_data": plan.to_dict(), "flat_program": prog.to_dict()})
 
-        plans.append({
-            **item,
-            "plan_data": plan.to_dict(),
-            "flat_program": prog.to_dict(),
-        })
-
+    # Log distribution
+    if call_counts:
+        logger.info(
+            "Composition plan stats: mean=%.2f, median=%.1f, max=%d calls",
+            sum(call_counts) / len(call_counts),
+            sorted(call_counts)[len(call_counts) // 2],
+            max(call_counts),
+        )
     logger.info("Built %d composition plans", len(plans))
     return plans
 
@@ -289,6 +399,7 @@ def build_training_data(plans: list, library: SubroutineLibrary, output_dir: str
 
     compose_data = []
     flat_data = []
+    inline_failures = 0
 
     for item in plans:
         problem = item["problem"]
@@ -300,12 +411,23 @@ def build_training_data(plans: list, library: SubroutineLibrary, output_dir: str
             "source": item.get("source", ""),
         })
 
-        flat_program_json = json.dumps(item["flat_program"])
+        # Derive flat program by inlining the composition plan for fair comparison
+        plan_obj = CompositionPlan.from_dict(item["plan_data"])
+        inlined = inline_program(plan_obj, library)
+        if inlined is not None:
+            flat_program_dict = inlined.to_dict()
+        else:
+            inline_failures += 1
+            flat_program_dict = item["flat_program"]
+        flat_program_json = json.dumps(flat_program_dict)
         flat_data.append({
             "instruction": f"Problem: {problem}\n\nGenerate an executable program (JSON):",
             "output": flat_program_json,
             "source": item.get("source", ""),
         })
+
+    if inline_failures > 0:
+        logger.warning("Inline failures (fell back to raw program): %d/%d", inline_failures, len(plans))
 
     os.makedirs(output_dir, exist_ok=True)
     with open(os.path.join(output_dir, "compose_train.json"), "w") as f:
@@ -362,6 +484,111 @@ def generate_synthetic_programs(data: list, source: str) -> list:
     return results
 
 
+def run_post_split(args, config):
+    """Post-split mode: rebuild library and training data using ONLY train partition."""
+    programs_path = args.programs_path or os.path.join(args.output_dir, "all_programs.json")
+    logger.info("=" * 60)
+    logger.info("  Post-split mode: rebuild from train partition only")
+    logger.info("=" * 60)
+
+    logger.info("Loading programs from %s", programs_path)
+    with open(programs_path) as f:
+        all_programs = json.load(f)
+    logger.info("Loaded %d total programs", len(all_programs))
+
+    logger.info("Loading MCD split from %s", args.split_path)
+    with open(args.split_path) as f:
+        mcd_split = json.load(f)
+
+    # Get train partition indices/IDs
+    train_ids = set()
+    if "train" in mcd_split:
+        train_partition = mcd_split["train"]
+        if isinstance(train_partition, list):
+            if train_partition and isinstance(train_partition[0], int):
+                train_ids = set(train_partition)
+            elif train_partition and isinstance(train_partition[0], str):
+                train_ids = set(train_partition)
+            elif train_partition and isinstance(train_partition[0], dict):
+                # List of dicts with an index or id field
+                for entry in train_partition:
+                    if "index" in entry:
+                        train_ids.add(entry["index"])
+                    elif "id" in entry:
+                        train_ids.add(entry["id"])
+
+    # Filter to train-only programs
+    if train_ids:
+        train_programs = []
+        for idx, prog in enumerate(all_programs):
+            prog_id = prog.get("program", {}).get("program_id", "")
+            if idx in train_ids or prog_id in train_ids:
+                train_programs.append(prog)
+        # If ID-based matching found nothing, try index-based
+        if not train_programs and all(isinstance(x, int) for x in train_ids):
+            train_programs = [all_programs[i] for i in sorted(train_ids) if i < len(all_programs)]
+    else:
+        logger.warning("Could not parse train partition from MCD split; using all programs")
+        train_programs = all_programs
+
+    logger.info("Train partition: %d programs (out of %d total)", len(train_programs), len(all_programs))
+
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    logger.info("=" * 60)
+    logger.info("  Rebuild Subroutine Library (train-only)")
+    logger.info("=" * 60)
+    library = build_subroutine_library(train_programs, config)
+    library.save(os.path.join(args.output_dir, "subroutine_library.json"))
+    logger.info("Library stats: %s", json.dumps(library.stats()))
+
+    logger.info("=" * 60)
+    logger.info("  Rebuild Composition Plans (train-only)")
+    logger.info("=" * 60)
+    plans = build_composition_plans(train_programs, library)
+
+    # --- Diagnostic: measure plan faithfulness (does NOT filter) ---
+    logger.info("Measuring plan faithfulness (diagnostic, not filtering)...")
+    comp_exec = CompositionExecutor(library)
+    n_faithful = 0
+    for item in plans:
+        plan_obj = CompositionPlan.from_dict(item["plan_data"])
+        bindings = item.get("bindings", {})
+        success, result, _stats = comp_exec.execute(plan_obj, bindings)
+        gold = item.get("exec_result", item.get("answer"))
+        if success and result is not None and _answer_matches(result, str(gold)):
+            n_faithful += 1
+    pct = (n_faithful / len(plans) * 100) if plans else 0.0
+    logger.info("Plan faithfulness (diagnostic): %d/%d (%.1f%%)", n_faithful, len(plans), pct)
+    # NOTE: We keep ALL structurally-matched plans as training data.
+    # The planner learns problem->plan mapping; faithfulness measures
+    # how well the subroutine's fixed expressions generalize.
+
+    logger.info("=" * 60)
+    logger.info("  Rebuild Training Data (train-only)")
+    logger.info("=" * 60)
+    build_training_data(plans, library, args.output_dir)
+
+    logger.info("=" * 60)
+    logger.info("  Post-split rebuild complete")
+    logger.info("  Train programs: %d", len(train_programs))
+    logger.info("  Library: %d subroutines", library.size)
+    logger.info("  Plans: %d", len(plans))
+    logger.info("=" * 60)
+
+    meta = {
+        "total_programs": len(all_programs),
+        "train_programs": len(train_programs),
+        "library_size": library.size,
+        "plans": len(plans),
+        "post_split": True,
+        "split_path": args.split_path,
+    }
+    with open(os.path.join(args.output_dir, "extraction_meta.json"), "w") as f:
+        json.dump(meta, f, indent=2)
+    logger.info("Extraction metadata saved to %s/extraction_meta.json", args.output_dir)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Extract executable programs from CoT traces")
     parser.add_argument("--config", type=str, default=str(Path(__file__).resolve().parent.parent / "configs" / "template_config.yaml"))
@@ -370,10 +597,21 @@ def main():
     parser.add_argument("--use_student", action="store_true", help="Use student model (9B) instead of teacher (32B)")
     parser.add_argument("--synthetic", action="store_true", help="Use synthetic programs (for smoke testing)")
     parser.add_argument("--allow_synthetic", action="store_true", help="Allow synthetic fallback when real data unavailable")
+    parser.add_argument("--post_split", action="store_true", help="Post-split mode: rebuild library/plans/training data from train partition only")
+    parser.add_argument("--split_path", type=str, default=None, help="Path to MCD split JSON (required for --post_split)")
+    parser.add_argument("--programs_path", type=str, default=None, help="Path to all_programs.json (defaults to output_dir/all_programs.json)")
     args = parser.parse_args()
 
     with open(args.config) as f:
         config = yaml.safe_load(f)
+
+    # Post-split mode: rebuild library and training data from train partition only
+    if args.post_split:
+        if not args.split_path:
+            parser.error("--split_path is required when using --post_split")
+        run_post_split(args, config)
+        return
+
     os.makedirs(args.output_dir, exist_ok=True)
 
     logger.info("=" * 60)
@@ -415,39 +653,20 @@ def main():
     with open(os.path.join(args.output_dir, "all_programs.json"), "w") as f:
         json.dump(all_programs, f, indent=2, ensure_ascii=False)
 
+    # NOTE: Library, composition plans, and training data are NO LONGER built here.
+    # They must be built AFTER the MCD split to prevent test data leakage.
+    # Use --post_split mode after running build_mcd_split.py.
     logger.info("=" * 60)
-    logger.info("  Stage 2: Build Subroutine Library")
-    logger.info("=" * 60)
-    library = build_subroutine_library(all_programs, config)
-    library.save(os.path.join(args.output_dir, "subroutine_library.json"))
-    logger.info("Library stats: %s", json.dumps(library.stats()))
-
-    logger.info("=" * 60)
-    logger.info("  Stage 3: Build Composition Plans")
-    logger.info("=" * 60)
-    plans = build_composition_plans(all_programs, library)
-
-    logger.info("=" * 60)
-    logger.info("  Stage 4: Build Training Data")
-    logger.info("=" * 60)
-    build_training_data(plans, library, args.output_dir)
-
-    logger.info("=" * 60)
-    logger.info("  Template extraction complete")
+    logger.info("  Program extraction complete")
     logger.info("  Programs: %d", len(all_programs))
-    logger.info("  Library: %d subroutines", library.size)
-    logger.info("  Plans: %d", len(plans))
+    logger.info("  Next: run build_mcd_split.py, then re-run with --post_split")
     logger.info("=" * 60)
 
-    synthetic_count = sum(1 for p in all_programs if p.get("source", "").startswith("synth") or any(
-        item.get("is_synthetic") for item in source_data.get(p.get("source", ""), []) if isinstance(item, dict)
-    ))
     meta = {
         "total_programs": len(all_programs),
-        "library_size": library.size,
-        "plans": len(plans),
         "synthetic_used": args.synthetic or args.allow_synthetic,
         "synthetic_flag": "--synthetic" in sys.argv or "--allow_synthetic" in sys.argv,
+        "post_split_required": True,
     }
     if args.synthetic:
         meta["warning"] = "ALL programs are synthetic — not valid for research evaluation"

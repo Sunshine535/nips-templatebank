@@ -359,27 +359,59 @@ def inline_program(plan: CompositionPlan, library: SubroutineLibrary) -> Optiona
     """Convert a composition plan to a flat (inlined) program.
 
     This is used for the flat-program baseline: same DSL, no library calls.
+    Each subroutine's internal variables are prefixed with ``_s{counter}_``
+    to avoid collisions, and all references in ``expr`` and ``inputs`` are
+    rewritten accordingly.  Slot names (the external interface) are **not**
+    renamed.  Intermediate ``OUTPUT`` steps are demoted to ``COMPUTE`` so
+    that only the final subroutine's output is emitted.
     """
-    all_slots = {}
-    all_steps = []
+    all_slots: Dict[str, Slot] = {}
+    all_steps: List[Step] = []
     step_counter = 0
 
-    for call in plan.calls:
+    num_calls = len(plan.calls)
+    for call_idx, call in enumerate(plan.calls):
         sub_id = call.get("sub_id", "")
         sub = library.get(sub_id)
         if sub is None:
             return None
 
+        # Collect slots (shared across calls, not renamed)
+        slot_names = {slot.name for slot in sub.program.slots}
         for slot in sub.program.slots:
             if slot.name not in all_slots:
                 all_slots[slot.name] = slot
 
-        for step in sub.program.steps:
+        # Build rename map for this subroutine's internal step targets.
+        # Slot names are NOT renamed — they are the external interface.
+        rename_map: Dict[str, str] = {}
+        for i, step in enumerate(sub.program.steps):
+            if step.target not in slot_names:
+                rename_map[step.target] = f"_s{step_counter + i}_{step.target}"
+
+        for i, step in enumerate(sub.program.steps):
+            new_target = rename_map.get(step.target, step.target)
+
+            # Rename inputs
+            new_inputs = [rename_map.get(inp, inp) for inp in step.inputs]
+
+            # Rename variable references in expr
+            new_expr = step.expr
+            for old_name, new_name in rename_map.items():
+                new_expr = re.sub(
+                    r'\b' + re.escape(old_name) + r'\b', new_name, new_expr
+                )
+
+            # Convert intermediate OUTPUT to COMPUTE
+            new_op = step.op
+            if step.op == Op.OUTPUT and call_idx < num_calls - 1:
+                new_op = Op.COMPUTE
+
             inlined = Step(
-                op=step.op,
-                target=f"_s{step_counter}_{step.target}",
-                expr=step.expr,
-                inputs=step.inputs,
+                op=new_op,
+                target=new_target,
+                expr=new_expr,
+                inputs=new_inputs,
                 target_dtype=step.target_dtype,
             )
             all_steps.append(inlined)

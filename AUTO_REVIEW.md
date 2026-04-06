@@ -1,93 +1,103 @@
-# AUTO REVIEW
+# ATLAS Auto Review Log
 
-## Round 2 — 2026-03-31
+## Round 1 (2026-04-04) — Post-ATLAS Redesign
 
-**Reviewer**: ARIS Codex MCP
-**Previous Score**: 8/10
-**New Score**: 9/10
+### Assessment (Summary)
+- Score: **2/10**
+- Verdict: **NOT READY**
+- Key criticisms:
+  1. MCTS uses gold answer as reward (cheating)
+  2. MCD split has zero unseen compounds (benchmark invalid)
+  3. Results too weak (4% on N=50)
+  4. Real data artifacts marked as synthetic (contamination)
+  5. Programs not verified against gold answer
+  6. Composition fallback to generic subroutine (brittle)
+  7. Novelty claims overstated relative to evidence
 
-### Fixes Applied
+<details>
+<summary>Click to expand full reviewer response</summary>
 
-1. **retrieval_compose evaluation bug** — `eval_retrieval_compose()` now creates a `CompositionExecutor(sub_lib)` from the retrieved sublibrary instead of executing against the full library. This ensures the planner's retrieval decision actually constrains execution.
+Score: 2/10 for a top venue. The idea is interesting, and some core machinery exists, but the current paper story is not supported by valid or strong enough evidence.
 
-2. **fallback_free_accuracy computation** — Both `eval_compose()` and `eval_retrieval_compose()` now track `correct_no_fallback` separately (incremented only when execution succeeds and the answer is correct), instead of the incorrect formula `(correct - fallback_used)` which conflated fallback-correct with execution-correct.
+Critical Weaknesses:
 
-3. **Config-to-code contract**:
-   - `build_mcd_split.py` now accepts `--config` and reads `mcd_split` block (train/dev/test ratios, max_atom_tvd, min_unseen_test_compounds, num_trials) from config; CLI args override.
-   - `run_template_operations.py` no longer crashes when `evaluation.test_datasets` is missing.
-   - `run_all_experiments.sh` reads `NUM_SEEDS` from `evaluation.num_seeds` in config instead of hardcoding 3.
+1. The MCTS evaluation is not valid as presented. The eval code passes the gold answer into search, and the rollout reward scores closeness to that gold answer. Without gold, the fallback reward just prefers longer plans. Minimum fix: remove answer-conditioned reward entirely, replace it with a label-free search objective, and rerun the full MCTS comparison from scratch.
 
-4. **Reproducibility test suite** — Added `tests/test_templatebank.py` with 16 tests:
-   - Executor: simple add/mul, missing binding, multi-step, type coercion (5 tests)
-   - CompositionExecutor: single call, chained calls, unknown subroutine, initial bindings (4 tests)
-   - Library save/load: round-trip, execution after reload, JSON validity (3 tests)
-   - MCD split: index coverage, no overlap, stats present (3 tests)
-   - End-to-end smoke: full pipeline from library build to plan execution (1 test)
+2. The claimed compositional-generalization benchmark is not actually established. The saved split has zero unseen test compounds, despite the code targeting nontrivial unseen-compound divergence. Minimum fix: produce a real MCD split with substantial unseen compounds and low atom drift, then report the main compose-vs-flat result on that split.
 
-### Remaining
+3. The empirical result is far too weak for NeurIPS/ICML. 4% on N=50 is not persuasive, and the "real" setting is 0%. Minimum fix: audit the metric pipeline, regenerate all results from one reproducible command, and show statistically reliable gains on real data over the flat baseline and CoT.
 
-- Multi-GPU for extraction/eval is still single-process (`device_map="auto"`); only training uses `torchrun`.
+4. The "real-data" pipeline appears contaminated or at least ambiguously tracked. The supposed real extraction artifact still says synthetic_used: true. Minimum fix: remove synthetic fallback from all main experiments, fail hard if real data are unavailable, and regenerate clean artifacts with provenance per sample.
+
+5. The supervision pipeline is not semantically trustworthy enough. Program extraction accepts any executable program without checking it matches the gold answer. Minimum fix: only keep extracted programs whose execution matches the gold answer, add a stronger binding/grounding mechanism, and report extraction correctness separately from execution rate.
+
+6. The composition mechanism is still brittle and partly heuristic. Failed decompositions can fall back to a generic best-supported subroutine. Minimum fix: add constrained decoding and stricter binding semantics, then report oracle decomposition coverage vs learned planner accuracy.
+
+7. The novelty framing is overstated relative to the evidence. "First" claims are not justified by the current results. Minimum fix: either substantially strengthen experiments or reframe as a preliminary systems/prototype study.
+
+Verdict: READY for submission: No. This is not close to NeurIPS/ICML-ready.
+
+</details>
+
+### Actions Taken
+
+1. **Fixed MCTS reward** (weakness #1): Removed gold-answer-conditioned reward entirely. MCTS now uses label-free criteria only: execution success (0.4), multi-call plan structure (0.3), non-trivial result (0.2), reasonable numeric range (0.1). `gold_answer` parameter removed from all APIs.
+
+2. **Fixed extraction verification** (weakness #5): Programs now only kept if execution output matches gold answer (`gold_verified: True`). Ensures training data semantic correctness.
+
+3. **Removed generic fallback** (weakness #6): Programs that can't be decomposed are skipped (no more falling back to "best-supported" subroutine).
+
+4. **Updated all APIs and tests**: 22/22 tests pass with new label-free MCTS.
+
+### Remaining for Round 2
+- MCD split validity (needs diverse real programs)
+- Empirical strength (needs full-scale extraction + training)
+- Data provenance (need clean separation of synthetic/real)
+- Novelty framing (needs evidence to back claims)
+
+### Status
+- Continuing to round 2
+- Difficulty: medium
 
 ---
 
-## Round 1 — 2026-03-31
+## Round 2 (2026-04-04)
 
-**Reviewer**: Codex
-**Score**: 3/10
+### Assessment (Summary)
+- Score: **3/10** (up from 2)
+- Verdict: **NOT READY** (but engineering credibility improved)
+- Reviewer verified: MCTS label-free fix, gold verification, fallback removal all correct
 
-Overall assessment: the repository has a reasonable scaffold and some core components are readable, but it is not yet ready to support NeurIPS-grade experimental claims. The main blockers are methodological mismatches between the README/config and the actual code, silent synthetic fallbacks, incomplete evaluation wiring, and only partial support for multi-GPU execution and resume.
+<details>
+<summary>Click to expand full reviewer response</summary>
 
-## Major Findings
+Rescore: 3/10. That is an improvement from 2/10, because the most serious validity bug is fixed in the main path. The engineering credibility is better. The scientific case is still weak.
 
-### 1. Experimental protocol is incomplete and partially disconnected
+Why It's Still Low:
+- No fresh post-fix evidence yet. results/eval/ still contains the earlier weak/inconsistent artifacts.
+- The core compositional benchmark is still not real: the saved split still has zero unseen compounds.
+- The "real" pipeline is still provenance-contaminated: synthetic_used: true.
+- The current real-plan pool is still mostly single-call: 26 multi-call out of 146.
+- MCTS is now valid, but still heuristic. Rewarding "finite nontrivial numbers" is not a publishable justification by itself.
 
-- `scripts/run_all_experiments.sh:68-75` builds an MCD split, but `scripts/eval_template_reasoning.py:308-339` and `scripts/eval_template_reasoning.py:345-355` never use `--split_path`; evaluation runs on the raw benchmark `test_split` instead of the generated MCD split.
-- `configs/template_config.yaml:85-102` advertises `cot_budget`, `retrieval_compose`, and `num_seeds: 3`, but `scripts/eval_template_reasoning.py:363-390` only executes `compose`, `flat_inline`, and `direct_cot` for a single seed.
-- `scripts/run_all_experiments.sh:117-125` marks the library-size ablation stage complete after creating empty directories. There is no ablation logic.
+Minimum Viable Path To 6/10:
+1. Narrow the paper. Fragment mining + composition planning as main claim. MCTS optional.
+2. Produce one clean dataset story. GSM8K only, no synthetic fallback, >= 1k gold-verified programs.
+3. Build a real compositional split. Multi-call plans, meaningful unseen compound divergence.
+4. Hit one credible empirical result. Compose beats flat by >= 5 absolute points, 3 seeds, CIs.
+5. Run only the ablations that matter. Fragment vs whole-program, compose vs flat, compose+MCTS.
+6. Clean the artifact story. One command regenerates the final tables.
 
-### 2. Data integrity and result validity are not reliable enough
+</details>
 
-- `scripts/extract_templates.py:103-105` silently falls back to synthetic benchmark data if dataset loading fails.
-- `scripts/train_template_compiler.py:50-53` silently trains on synthetic data if training files are missing.
-- `scripts/extract_templates.py:150-161` accepts any executable program; it never checks `exec_result` against the gold `answer`, even though the README claims correct executable filtering.
-- `scripts/extract_templates.py:206-233` and `scripts/extract_templates.py:236-263` implement a much weaker method than claimed: library mining is by operator sequence only, and every "composition plan" is reduced to a single library call.
-- `src/mcd_split.py:98-150` exposes `min_unseen_compounds` but never enforces it. Combined with single-call plans and compound extraction that largely reduces to binding keys and positions (`src/mcd_split.py:39-58`), the split is not yet a convincing compositional benchmark.
+### Actions Taken
+Round 2 is code-fix-only (no new experiments due to compute constraints).
 
-### 3. Multi-GPU support is partial, not end-to-end
+The reviewer's path to 6/10 requires:
+- **~4-14 hours of GPU time** for full GSM8K extraction (sequential LLM inference)
+- This is the blocking constraint — all other fixes depend on having sufficient real data
 
-- Positive: Stage 3 training is set up to use `torchrun` (`scripts/run_all_experiments.sh:78-99`), and the trainer places each rank on `LOCAL_RANK` (`scripts/train_template_compiler.py:122-128`).
-- Negative: extraction and evaluation are not implemented as distributed multi-GPU workloads. They load a single model with `device_map="auto"` and iterate serially over the dataset (`scripts/extract_templates.py:385-390`, `scripts/eval_template_reasoning.py:365-388`), which is not the same as data-parallel experiment execution.
-- `scripts/gpu_utils.sh:8-31` hard-fails when `nvidia-smi` is unavailable, so even the smoke path is GPU-only.
-
-### 4. Checkpoint resume support is only partial
-
-- Positive: the trainer auto-resumes from the latest `checkpoint-*` directory (`scripts/train_template_compiler.py:173-179`), and the top-level pipeline skips completed phases via marker files (`scripts/run_all_experiments.sh:17-25`).
-- Negative: resume is coarse-grained. Extraction and evaluation restart whole stages after interruption, and phase markers do not verify that outputs are complete or consistent before skipping.
-
-### 5. Code quality is mixed and reproducibility is weak
-
-- I found no test suite in the repository. Static validation is limited.
-- The repo still contains stale code paths. For example, `scripts/eval_template_algebra.py:149-175` expects config keys (`config["extraction"]`, `config["evaluation"]["test_datasets"]`) that do not exist in the current config.
-- The checked-in pilot path is not runnable as-is: `README_RUN.md:3-8`, `EXPERIMENTS.md:32-42`, and `scripts/run_templatebank_pilot.py:11` / `scripts/run_templatebank_pilot.py:170-176` point to missing `methods/...` files. Running `python3 scripts/run_templatebank_pilot.py` currently fails with `FileNotFoundError`.
-- The current `results/` directory only contains pilot JSON snapshots, not outputs from the advertised full pipeline.
-
-## Strengths
-
-- The repository structure is clean and the intent of each stage is understandable.
-- Core local components are at least syntactically valid: `python3 -m compileall src scripts` passed.
-- A minimal local smoke check of the DSL executor and MCD splitter succeeded.
-
-## Readiness Verdict
-
-Not ready to produce paper-quality experimental results. In its current state, I would view this repository as a prototype scaffold rather than a reproducible experiment package.
-
-## Actionable Feedback
-
-1. Remove silent synthetic fallbacks from the default pipeline. Keep synthetic data only behind explicit opt-in flags, and record that mode in output metadata.
-2. Make Stage 1 correctness-preserving: generate multiple candidates per example, execute them, and retain only programs whose output matches the gold answer.
-3. Rework subroutine mining and planner targets so plans can contain multiple calls. Then use those plans to build a real MCD split and enforce the configured unseen-compound threshold.
-4. Wire the generated split into training and evaluation. If the paper claims MCD generalization, the evaluation script must actually consume `results/mcd_split.json`.
-5. Finish the evaluation matrix: implement `cot_budget`, `retrieval_compose`, multi-seed runs, and actual library-size ablations with saved per-seed metrics.
-6. Decide what "multi-GPU support" means operationally. If only training is distributed, say so; otherwise add true distributed extraction/evaluation or batched sharded inference.
-7. Add a small reproducibility suite: unit tests for the DSL/executor and split logic, plus a tiny checked-in fixture dataset that exercises the full smoke path without external private files.
-8. Delete or repair stale scripts and docs so the repository has one authoritative path to reproduce results.
+### Status
+- Round 2 complete (code fixes verified, path to 6/10 identified)
+- **Next action**: Run full GSM8K extraction overnight (~3000 problems → ~1000 gold-verified)
+- Difficulty: medium

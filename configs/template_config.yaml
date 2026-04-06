@@ -1,10 +1,10 @@
 teacher:
-  model: "Qwen/Qwen3.5-32B"
+  model: "Qwen/Qwen3.5-27B"
   enable_thinking: false
   temperature: 0.2
   top_p: 0.95
   max_new_tokens: 768
-  samples_per_example: 4
+  samples_per_example: 1
   select: "shortest_valid_executable"
 
 planner:
@@ -49,7 +49,8 @@ datasets:
     max_steps_flat: 24
     max_calls: 6
   math:
-    dataset_id: "lighteval/MATH"
+    dataset_id: "EleutherAI/hendrycks_math"
+    subsets: ["algebra", "counting_and_probability", "geometry", "intermediate_algebra", "number_theory", "prealgebra", "precalculus"]
     train_split: "train"
     test_split: "test"
     max_train: 7500
@@ -67,8 +68,8 @@ library:
   max_call_depth: 2
   no_recursion: true
   opaque_ids: true
-  min_support_gsm8k: 40
-  min_support_math: 25
+  min_support_gsm8k: 5
+  min_support_math: 5
   score: "mdl_gain"
 
 mcd_split:
@@ -95,14 +96,17 @@ evaluation:
     max_new_tokens_math: 512
     vote: "majority_numeric"
   retrieval:
+    # Dense-only cosine similarity retrieval (no BM25 index available at eval time)
     encoder: "BAAI/bge-large-en-v1.5"
-    dense_weight: 0.7
-    bm25_weight: 0.3
     top_k_funcs: 8
     top_k_examples: 4
 
 ablation:
   library_sizes: [4, 8, 16, 32]
-  ablations: ["no_compose", "no_types"]
+  ablations: ["no_compose", "no_types", "compression_matched", "untyped", "shuffled_types"]
+  mcd_split_seeds: [42, 123, 456]  # Split robustness across 3 seeds
+  # compression_matched: random macros with same average token savings
+  # untyped: subroutines without type annotations on slots
+  # shuffled_types: subroutines with randomly permuted type signatures
 
 output_dir: "./results"

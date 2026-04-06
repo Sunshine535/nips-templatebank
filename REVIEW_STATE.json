@@ -1,37 +1,17 @@
 {
-  "project": "nips-templatebank",
-  "score": 9,
-  "out_of": 10,
-  "ready_for_results": true,
-  "review_file": "AUTO_REVIEW.md",
-  "updated_at": "2026-03-31",
-  "status": "code_quality_pass",
-  "previous_score": 8,
-  "code_fixes_applied": "2026-03-31",
-  "estimated_score_after_fixes": 9.0,
-  "round_2_fixes": [
-    "eval_template_reasoning.py: retrieval_compose now executes against the retrieved sublibrary (CompositionExecutor(sub_lib)) instead of the full library",
-    "eval_template_reasoning.py: fallback_free_accuracy in both eval_compose and eval_retrieval_compose now tracks correct_no_fallback separately instead of the incorrect (correct - fallback_used) formula",
-    "build_mcd_split.py: added --config flag; reads mcd_split block (train/dev/test ratios, max_atom_tvd, min_unseen_test_compounds, num_trials) from config with CLI override",
-    "run_template_operations.py: load_test_datasets no longer crashes when evaluation.test_datasets is missing from config",
-    "run_all_experiments.sh: NUM_SEEDS now reads evaluation.num_seeds from config instead of hardcoding 3",
-    "Added tests/test_templatebank.py with 16 tests: Executor round-trip (5), CompositionExecutor (4), Library save/load (3), MCD split invariants (3), end-to-end smoke (1)"
-  ],
-  "fixes_applied": [
-    "Stage 5 ablation: changed from percentage fracs (25/50/75/100) to explicit L={4,8,16,32} matching config and README",
-    "Stage 4 eval: added multi-seed loop (num_seeds=3) from config evaluation.num_seeds",
-    "eval_template_reasoning.py: cot_budget now reads temperature/top_p/max_new_tokens/vote from config evaluation.cot_budget",
-    "eval_template_reasoning.py: added eval_retrieval_compose() implementing the retrieval_compose method from config",
-    "eval_template_reasoning.py: n_samples for cot_budget now uses config evaluation.rerank_n (3) instead of hardcoded 5",
-    "eval_template_reasoning.py: added --skip_retrieval flag for ablation runs",
-    "extract_templates.py: _synthetic_fallback now emits explicit WARNING log and marks items with is_synthetic=True",
-    "extract_templates.py: saves extraction_meta.json with synthetic_used flag for downstream audit",
-    "mcd_split.py: min_unseen_compounds now enforced as hard constraint in first pass; relaxed fallback with doubled atom_tvd if needed",
-    "setup.sh: Python detection now checks CONDA_PREFIX and conda info --base for conda-only servers; validates version >= 3.10",
-    "run_all_experiments.sh: Stage 5 ablation passes --split_path to eval for MCD-split-aware evaluation",
-    "run_all_experiments.sh: random control ablation uses L=16 (main_size) instead of 50% fraction"
-  ],
-  "remaining_items": [
-    "Multi-GPU for extraction/eval still single-process (torchrun only for training)"
+  "round": 2,
+  "threadId": "019d57de-49c1-77c3-9b2a-c43e3f9d45d7",
+  "status": "in_progress",
+  "difficulty": "medium",
+  "last_score": 3.0,
+  "last_verdict": "not ready",
+  "pending_experiments": ["full_gsm8k_extraction"],
+  "timestamp": "2026-04-04T09:00:00",
+  "path_to_6": [
+    "1k+ gold-verified GSM8K programs",
+    "Real MCD split with unseen compounds > 0",
+    "Compose > flat by >= 5 absolute points",
+    "3 seeds with confidence intervals",
+    "Clean one-command reproducibility"
   ]
 }
