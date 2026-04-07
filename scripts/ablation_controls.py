@@ -164,6 +164,112 @@ def build_shuffled_types(library: SubroutineLibrary, seed: int = 42) -> Subrouti
 
 
 # ---------------------------------------------------------------------------
+# Frequency-matched control: top-K by support, ignoring MDL
+# ---------------------------------------------------------------------------
+
+def build_frequency_matched(library: SubroutineLibrary, programs: list,
+                            seed: int = 42) -> SubroutineLibrary:
+    """Select top-K subroutines by raw frequency (support), ignoring MDL gain.
+
+    Same real subroutines, but selected by popularity not compression quality.
+    Isolates whether MDL-based selection matters vs just picking common patterns.
+    """
+    # Recount support from programs
+    from collections import Counter
+    sig_count = Counter()
+    sig_to_steps = {}
+    for item in programs:
+        prog = Program.from_dict(item["program"])
+        sig = tuple(f"{s.op.value}:{s.expr}" for s in prog.steps)
+        sig_count[sig] += 1
+        sig_to_steps[sig] = prog
+
+    # Pick top-K by frequency (K = original library size)
+    K = library.size
+    top_sigs = sig_count.most_common(K)
+
+    new_lib = SubroutineLibrary()
+    for i, (sig, count) in enumerate(top_sigs):
+        prog = sig_to_steps[sig]
+        sub = Subroutine(
+            sub_id=f"L{i:02d}",
+            program=copy.deepcopy(prog),
+            support=count,
+            mdl_gain=0.0,  # explicitly zero — not MDL-selected
+        )
+        new_lib.subroutines[sub.sub_id] = sub
+        new_lib._fp_index[prog.fingerprint()] = sub.sub_id
+
+    logger.info("Frequency-matched library: %d subroutines (top-%d by support)",
+                new_lib.size, K)
+    return new_lib
+
+
+# ---------------------------------------------------------------------------
+# Uncompressed program bank: matched-size exemplar bank without compression
+# ---------------------------------------------------------------------------
+
+def build_uncompressed_bank(library: SubroutineLibrary, programs: list,
+                            seed: int = 42) -> SubroutineLibrary:
+    """Create a matched-size bank of complete programs (no compression).
+
+    Each "subroutine" is a full verified program, not a compressed fragment.
+    Same total token budget as the real library. Isolates whether compression
+    itself matters vs just having exemplar programs available.
+    """
+    rng = random.Random(seed)
+
+    # Compute total token budget of real library
+    real_total_steps = sum(len(s.program.steps) for s in library.subroutines.values())
+    K = library.size
+
+    # Sample K programs, preferring those closest to mean step count
+    mean_steps = real_total_steps / max(K, 1)
+    scored = []
+    for item in programs:
+        prog = Program.from_dict(item["program"])
+        score = abs(len(prog.steps) - mean_steps)
+        scored.append((score, item, prog))
+    scored.sort(key=lambda x: x[0])
+
+    # Deduplicate by fingerprint
+    seen_fp = set()
+    selected = []
+    for _, item, prog in scored:
+        fp = prog.fingerprint()
+        if fp not in seen_fp:
+            seen_fp.add(fp)
+            selected.append((item, prog))
+        if len(selected) >= K:
+            break
+
+    # If not enough unique, sample remaining randomly
+    if len(selected) < K:
+        remaining = [(item, Program.from_dict(item["program"]))
+                     for item in programs
+                     if Program.from_dict(item["program"]).fingerprint() not in seen_fp]
+        rng.shuffle(remaining)
+        selected.extend(remaining[:K - len(selected)])
+
+    new_lib = SubroutineLibrary()
+    for i, (item, prog) in enumerate(selected):
+        sub = Subroutine(
+            sub_id=f"L{i:02d}",
+            program=copy.deepcopy(prog),
+            support=1,  # each is a unique full program
+            mdl_gain=0.0,
+        )
+        new_lib.subroutines[sub.sub_id] = sub
+        new_lib._fp_index[prog.fingerprint()] = sub.sub_id
+
+    logger.info("Uncompressed program bank: %d full programs (matched-size, "
+                "real=%d steps, bank=%d steps)",
+                new_lib.size, real_total_steps,
+                sum(len(s.program.steps) for s in new_lib.subroutines.values()))
+    return new_lib
+
+
+# ---------------------------------------------------------------------------
 # Rebuild training data from modified library
 # ---------------------------------------------------------------------------
 
@@ -240,7 +346,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Ablation controls: compression-matched macros and typing variants")
     parser.add_argument("--ablation", required=True,
-                        choices=["compression_matched", "untyped", "shuffled_types"],
+                        choices=["compression_matched", "untyped", "shuffled_types",
+                                 "frequency_matched", "uncompressed_bank"],
                         help="Which ablation to run")
     parser.add_argument("--library_path", type=str, required=True,
                         help="Path to real subroutine_library.json")
@@ -276,6 +383,10 @@ def main():
         modified_lib = build_untyped(library)
     elif args.ablation == "shuffled_types":
         modified_lib = build_shuffled_types(library, seed=args.seed)
+    elif args.ablation == "frequency_matched":
+        modified_lib = build_frequency_matched(library, programs, seed=args.seed)
+    elif args.ablation == "uncompressed_bank":
+        modified_lib = build_uncompressed_bank(library, programs, seed=args.seed)
     else:
         raise ValueError(f"Unknown ablation: {args.ablation}")
 

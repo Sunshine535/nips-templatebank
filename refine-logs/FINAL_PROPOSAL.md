@@ -1,165 +1,152 @@
-# Research Proposal: Compositional Template Programs for Mathematical Reasoning
+# Verified Procedural Abstractions Enable Transferable Compositional Math Reasoning
 
 ## Problem Anchor
-- **Bottom-line problem**: Current LLM reasoning (CoT) regenerates reasoning traces from scratch for every problem, unable to systematically reuse and compose proven reasoning patterns.
-- **Must-solve bottleneck**: Existing reasoning reuse methods cannot **compose** fragments from different reasoning traces. When a problem requires combining patterns A and B never seen together in training, all current methods fail.
-- **Non-goals**: General program synthesis, pretraining, saturated benchmarks.
-- **Constraints**: 8×A100, ~2000 GPU-hours, Qwen3.5-9B, NeurIPS 2026.
-- **Success condition**: ≥15% accuracy gain on compositional held-out set over CoT, ≥10% over retrieval, ≥40% fewer tokens.
+Question: can a frozen, execution-verified library of typed procedural abstractions mined from Qwen3.5-32B improve small-model compositional generalization on math problems whose atomic ingredients are matched but whose higher-order compositions are novel?
 
-## Technical Gap
+Falsifiable thesis:
+1. On GSM8K MCD-hard, a frozen verified library transferred to Qwen3.5-9B beats a matched Qwen3.5-32B-CoT-distilled 9B baseline by >=15 absolute accuracy points.
+2. MDL compression ratio is a useful diagnostic of MCD transfer and outpredicts library size, mean trace length, and teacher answer accuracy.
+3. Typed MCTS repair recovers >=25% of initially failed plans under matched search budget.
 
-Reasoning reuse methods fall into four categories, all structurally unable to compose:
-1. **Retrieval** (ReasoningBank): Returns whole traces; cannot mix fragments.
-2. **Compression** (Metacognitive Reuse): Opaque tokens; cannot decompose/recombine.
-3. **Code generation** (PAL/PoT): One-off programs; no template reuse or composition.
-4. **Static frameworks** (Buffer of Thoughts): Hand-designed; cannot learn or compose.
+Not claimed:
+- not a universal reasoning claim;
+- not a "compression law";
+- not a search method with privileged labels.
 
-Missing: **a template library of typed reasoning programs + a compiler that composes templates for new problems**.
+## Method
+Core repo objects already exist in src/template_dsl.py: Program, Step, Subroutine, SubroutineLibrary, CompositionPlan, Executor, CompositionExecutor.
 
-## Method Thesis
-We build a library of typed reasoning templates distilled from CoT traces, and train a compiler that maps new problems to **composition plans** — sequences of (template_id, slot_bindings) — that are expanded and executed via the template library. This enables compositional generalization: solving problems whose reasoning requires combining templates never paired in training.
+Definitions:
+- Program p=(s1,...,sT): typed DSL steps.
+- Subroutine z: verified program fragment with typed slots, internal steps, output.
+- Library L={z1,...,zK}: frozen set of mined subroutines.
+- Composition plan pi=(c1,...,cm): ordered calls ci=(zi,bi) binding subroutine slots from environment.
+- Executor runs steps; CompositionExecutor runs plans over the library.
 
-## Contribution Focus
-- **Dominant**: Compositional template reuse — template library as inference substrate + compiler that selects and composes templates.
-- **Supporting**: Rigorous compositional evaluation protocol (3-layer unseen template-bigram holdout with difficulty matching and leakage audit).
-- **Non-contributions**: No new architecture, no pretraining, no formal algebraic theory.
+Pipeline:
+1. Qwen3.5-32B generates candidate DSL programs.
+2. Keep only parse-valid, type-valid, step-verified, final-answer-correct traces.
+3. Abstract constants into typed slots.
+4. Cluster by normalized structure.
+5. Score by MDL gain and support.
+6. Freeze top-K library from train only.
+7. Remap train examples into plans over the library.
+8. Train student planners to emit plans, not CoT.
 
-## Proposed Method
+Compression:
+- C_flat(x): code length of verified flat teacher program.
+- C_L(x): code length of shortest verified library composition.
+- Example ratio: CR(x;L)=C_flat(x)/C_L(x).
+- Split ratio: CR(D;L)=sum_x C_flat(x) / sum_x C_L(x).
+- DSL-token serializer is fixed across all variants.
+- MDL_gain(z)=sum_train(C_flat(x)-C_{L+{z}}(x)) - C(z).
 
-### Complexity Budget
-- **Frozen**: Qwen3.5-9B backbone (LoRA only, r=16, α=32, ~26M params)
-- **New**: Single LoRA adapter
-- **Excluded**: No retrieval system, no RL, no verifier, no multi-stage training
+Portability:
+- same frozen library mined once from Qwen3.5-32B on GSM8K-train;
+- transferred to Qwen3.5-9B and a second student;
+- second student is Qwen3.5-3B if stable, else Llama-3-8B-Instruct;
+- no student-specific reminting in portability runs.
 
-### System Overview
+## Formal MCD Split Construction
+Unit: verified composition plans, not raw text.
 
-```
-=== Phase 1: Template Library Construction (Offline) ===
-  For each (problem, answer) in GSM8K-train + MATH-Algebra-train:
-    Teacher (Qwen3.5-32B) generates K=5 candidate JSON-AST programs
-    Filter: JSON valid + types valid + executor correct answer
-    Rank by parsimony + reuse
-  Abstract valid programs → typed templates (values → slots)
-  Cluster by normalized AST structure → deduplicate
-  → Template Library L: ~200 typed template programs
+Atoms:
+- internal primitive op multiset after inlining;
+- slot type signature multiset, e.g. (int,float)->float;
+- call arity;
+- call count;
+- provisional subroutine identity for temporary split-building library.
 
-=== Phase 2: Training Data Construction ===
-  For each problem: map gold program → composition plan [(template_id, bindings), ...]
-  Multiple valid plans → rank by parsimony + reuse → top-3 as training targets
-  → 10K-15K (problem, composition_plan) pairs
+Compounds:
+- inlined primitive-op bigrams and trigrams;
+- subroutine bigrams (zi,zj);
+- typed-call bigrams sig(zi)->sig(zj);
+- solution-graph edges from produced variables to downstream consumers;
+- solution-graph depth-aware 3-node motifs.
 
-=== Phase 3: Compiler Training ===
-  Qwen3.5-9B + LoRA: problem → JSON composition plan
-  Schema-constrained decoding (outlines): template IDs constrained to library
-  Multi-reference + rejection sampling
-  → Trained Compiler C
+Split constraints:
+- train/dev/test = 60/20/20;
+- atom TVD(train,test) <= 0.02;
+- unseen test compound ratio >= 0.40 on GSM8K-hard;
+- dev sampled from train atom family only;
+- only verified plans participate.
 
-=== Inference ===
-  Problem P → generate N=3 candidate plans → rerank (validity + execution + parsimony)
-  → Expand from library → typed binding → COMPOSE → execute → answer
-  → Fallback: standard CoT if all plans fail
-```
+Overlap audits, reported for every split:
+1. Lexical overlap: normalized n-gram Jaccard, numbers stripped. Success: no more than random split +2 points.
+2. Template overlap: normalized flat-program signature overlap. Success: >=40% unseen test templates.
+3. Operation-sequence overlap: unseen inlined op bigrams/trigrams. Success: trigram unseen >=35%.
+4. Solution-graph overlap: unseen dataflow edges/motifs. Success: edge unseen >=30%, motif unseen >=25%.
 
-### Core Mechanism: Template Composition Plans
+## Verification Protocol
+Step-level, not final-answer-only.
 
-The compiler outputs a **composition plan**, NOT a flat program:
-```json
-{
-  "plan": [
-    {"template_id": "multi_step_arithmetic_v3", "bindings": {"quantity": 12, "unit_price": 45.0}},
-    {"template_id": "percentage_discount_v1", "bindings": {"rate": 0.15}}
-  ]
-}
-```
+Stage A, static:
+- JSON parse;
+- Program.from_dict;
+- variable availability per step;
+- type coercion;
+- no forbidden builtins/operators;
+- consistent target typing.
 
-**Execution**:
-1. Load templates by ID from library L
-2. Bind explicit slot values from plan
-3. Auto-bind cross-template via typed output→input matching (COMPOSE)
-4. Execute deterministically
-5. Fallback on any failure
+Stage B, dynamic:
+1. execute each step under environment from prior steps;
+2. record expression, output value, typed environment delta;
+3. require no exception;
+4. require output type matches target_dtype;
+5. require deterministic replay of the entire environment trace.
 
-**Why compositional**: Compiler operates over template IDs. At training, sees (T_A,T_B) and (T_A,T_C). At test, composes (T_B,T_C) — never seen together. Template-level composition enables recombination.
+Additional step-level anti-shortcut check:
+- perturb irrelevant environment variables and require unchanged output for each step.
 
-### Template DSL
-**Types**: int | float | string | bool | list[Type]
-**Operators** (6): ASSIGN, COMPUTE, COMPARE, AGGREGATE, CONDITION, OUTPUT
+Acceptance targets:
+- GSM8K >=1500 verified teacher programs;
+- MATH stress subset >=1000 verified teacher programs.
 
-### Typed Binding Algorithm
-```
-function BIND(plan, library):
-  env = {}
-  for (tid, bindings) in plan:
-    template = library[tid]
-    for (slot, value) in bindings:
-      assert type(value) == template.input_slots[slot].type
-      env[slot] = (value, type)
-    for slot in template.input_slots not in bindings:
-      candidates = env entries matching slot.type
-      if |candidates| == 1: bind unambiguously
-      elif |candidates| > 1: bind most recent (recency heuristic)
-      else: FAIL → fallback
-    execute template steps, update env
-  return env["__output__"]
-```
+## Baselines And Fairness
+Required baselines:
+1. 32B-CoT-distilled 9B (primary comparison)
+2. flat_inline
+3. raw_trace_retrieval
+4. uncompressed_program_bank
+5. random_library
+6. frequency_matched_library
+7. retrieval_compose
+8. cot_budget
+9. search_enabled_flat
+10. search_enabled_retrieval
 
-### Compiler Training
-- Single LoRA on Qwen3.5-9B (r=16, α=32, dropout=0.05)
-- Input: problem + template signatures → Output: JSON composition plan
-- Schema-constrained decoding (outlines)
-- Multi-reference (top-3 valid plans), rejection sampling
-- lr=2e-4, cosine, 5 epochs, bf16, 8×A100
-- ~10K-15K training pairs
+Fairness: same split, same student, same train data, same token caps, same search budget (expansions + forward passes + executor calls), no test-time gold.
 
-### Inference-Time Reranking
-- Generate N=3 candidate plans (nucleus p=0.9)
-- Rerank: (1) type-check validity, (2) execution success, (3) shortest plan
-- Execute top valid plan; fallback if all fail
+Causal compression test: compressed library must beat matched-size uncompressed bank by >=5 and frequency-matched library by >=3 on GSM8K MCD-hard.
 
-### Failure Modes
-- Teacher fails → filter by correctness, voting across K=5
-- Too few templates → relax dedup, add MATH subfamilies
-- Low compilation → curriculum training, more data
-- No compositional gain → kill at CoT+5%
+## Library Audit Protocol
+- support histogram, reuse counts, MDL gain, redundancy rate
+- semantic coherence: >=70% of subroutines coherent (4/5 supports share role)
+- human-interpretable appendix: top 12 subroutines with examples
+- spurious-subroutine filters applied before portability experiments
 
-### Novelty
-| | ReasoningBank | MetaCog | PAL/PoT | BoT | **Ours** |
-|---|---|---|---|---|---|
-| Unit | Full trace | Compressed tokens | One-off code | Static framework | **Typed template** |
-| Composition | None | None | None | None | **Explicit COMPOSE** |
-| Library | Retrieval | Replay | None | Manual | **Compile + compose** |
+## Search-Time Repair
+Repair actions: substitute, modify binding, insert call, delete call, stop. All type-safe.
+Anti-cheating: equalized budget, no oracle correctness on test, hyperparameters frozen from dev.
 
-First to demonstrate compositional generalization through explicit template reuse in LLM math reasoning.
+## Failure Analysis Plan
+Label >=150 GSM8K + >=100 MATH failures into 8 categories.
+Report: count, percentage, representative example, library/planner/search attribution.
 
-## Validation
+## 8-Page Paper Outline
+- Intro (0.75p)
+- Setup/Formalism (0.9p)
+- Verified Library Mining (1.0p)
+- Controlled Splits (0.9p)
+- Search-Time Repair (0.7p)
+- Experiments (1.55p)
+- Results (1.35p)
+- Analysis/Limitations (0.85p)
 
-### Compositional Split (3-Layer)
-1. **Structural**: Hold out 15-20% of template bigram types
-2. **Distributional**: Difficulty-match via KS test
-3. **Leakage audit**: No paraphrases (BM25), individual templates seen in train, only bigram unseen
-4. **Stress test**: 5% individual templates held out entirely
+## Exact Acceptance Criteria
+1. compose beats CoT-distilled by >=15 on GSM8K MCD-hard (Qwen3.5-9B)
+2. frozen library improves second student by >=8 over its CoT-distilled baseline
+3. compression ratio is strongest predictor, p<0.05
+4. repair recovers >=25% of failed plans under matched budget
 
-### Metrics (5-Level)
-| Metric | Measures |
-|--------|----------|
-| Compiler coverage | % valid plans |
-| Compiler-only accuracy | No fallback |
-| Executor accuracy | Compilation succeeds |
-| Fallback rate | % routed to CoT |
-| Full system accuracy | End-to-end |
-
-### Baselines (6)
-CoT (0-shot), CoT (8-shot), PAL/PoT, BM25 trace retrieval, BM25+edit, BM25 template+greedy compose (same library)
-
-### Ablations (3)
-No-COMPOSE, no-types, flat-program (no template IDs)
-
-### Analysis
-- Error taxonomy: wrong template / wrong binding / execution error
-- Template usage distribution, composition depth histogram
-- Library statistics: coverage, reuse, bigram frequency
-- Confidence intervals + paired significance tests
-
-## Compute & Timeline
-~500 GPU-hours total, 5-6 weeks.
+If any fails, reframe to narrower supported claim.

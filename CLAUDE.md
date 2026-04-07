@@ -2,12 +2,13 @@
 
 ## Project goal
 
-Subroutine Composition for Mathematical Reasoning — prove that reusable subroutines improve program-compound generalization beyond a strong primitive DSL. Mine typed subroutine library from GSM8K+MATH, train a planner (Qwen3.5-9B + LoRA) to compose subroutines, evaluate on CFQ-style MCD split.
+Verified Procedural Abstractions Enable Transferable Compositional Math Reasoning. Three claims: (1) frozen 32B-mined verified library transferred to 9B beats CoT-distilled baseline by >=15pts on MCD-hard, (2) MDL compression ratio is strongest diagnostic predictor of compositional transfer, (3) typed MCTS repair recovers >=25% failed plans. See refine-logs/FINAL_PROPOSAL.md and refine-logs/EXPERIMENT_PLAN.md.
 
 ## Key models
 
-- `Qwen/Qwen3.5-32B` — Teacher (program extraction only)
-- `Qwen/Qwen3.5-9B` — Planner / Flat baseline (LoRA r=64, α=128)
+- `Qwen/Qwen3.5-32B` — Teacher (program extraction + library mining)
+- `Qwen/Qwen3.5-9B` — Student A / Planner (LoRA r=32, α=64)
+- `Qwen/Qwen3.5-3B` or `Llama-3-8B-Instruct` — Student B (portability test)
 
 ## Key datasets
 
@@ -46,10 +47,10 @@ nohup bash run.sh > run.log 2>&1 &
 FORCE_RERUN=1 bash run.sh
 
 # Train only compose planner
-torchrun --nproc_per_node=4 scripts/train_template_compiler.py --mode compose
+torchrun --nproc_per_node=$(nvidia-smi -L | wc -l) scripts/train_template_compiler.py --mode compose
 
 # Train only flat baseline
-torchrun --nproc_per_node=4 scripts/train_template_compiler.py --mode flat
+torchrun --nproc_per_node=$(nvidia-smi -L | wc -l) scripts/train_template_compiler.py --mode flat
 
 # Evaluate only
 python scripts/eval_template_reasoning.py --max_samples 100
@@ -91,9 +92,3 @@ python scripts/eval_template_reasoning.py --max_samples 100
 - Pipeline phases skip if marker file exists in `results/.phase_markers/`
 - Force re-run: `FORCE_RERUN=1`
 
-## Remote server
-
-- SSH: `sshpass -p '123456' ssh -p 30022 -o PubkeyAuthentication=no "wujn@root@ssh-362.default"@222.223.106.147`
-- GPU: 4x NVIDIA H800 80GB
-- Code dir: `/gfs/space/private/wujn/Research/nips-templatebank`
-- Background: `nohup bash run.sh > run.log 2>&1 &`

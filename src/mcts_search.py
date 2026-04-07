@@ -400,3 +400,345 @@ def mcts_solve(
     stats["result"] = result
 
     return plan, result, stats
+
+
+# ---------------------------------------------------------------------------
+# Search-time repair
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RepairCandidate:
+    """A single repair edit applied to a composition plan."""
+    kind: str  # substitute | rebind | insert | delete
+    position: int  # call index affected
+    plan: CompositionPlan
+    type_safe: bool = True
+
+
+class RepairSearcher:
+    """Bounded beam search over single-edit repairs of a failed plan.
+
+    Given a failed ``CompositionPlan``, enumerates one-edit neighbours
+    (substitute / rebind / insert / delete), executes each via the existing
+    ``Executor``, scores them with the same label-free reward used by MCTS,
+    and keeps the top-*beam_width* candidates.  Iterates up to
+    *max_iterations* rounds of repair.
+    """
+
+    def __init__(
+        self,
+        library: SubroutineLibrary,
+        initial_bindings: Dict[str, Any],
+        max_calls: int = 5,
+        beam_width: int = 4,
+        max_iterations: int = 3,
+    ):
+        self.library = library
+        self.initial_bindings = initial_bindings
+        self.executor = Executor()
+        self.comp_exec = CompositionExecutor(library, max_calls=max_calls)
+        self.max_calls = max_calls
+        self.beam_width = beam_width
+        self.max_iterations = max_iterations
+
+        # budget counters
+        self.forward_passes = 0
+        self.executor_calls = 0
+        self.total_nodes = 0
+
+    # -- reward (label-free, mirrors MCTS rollout criteria) ----------------
+
+    def _reward(self, plan: CompositionPlan, type_safe: bool) -> float:
+        """Score a candidate plan without access to gold labels.
+
+        Reward components
+        -----------------
+        +0.25  for each successfully-executed call beyond the original
+        +0.10  if every call executes without error
+        -0.05  per call (length penalty)
+        -0.10  if the edit is type-unsafe
+        """
+        self.executor_calls += 1
+        env = dict(self.initial_bindings)
+        calls_ok = 0
+        output = None
+
+        for call in plan.calls:
+            sub = self.library.get(call.get("sub_id", ""))
+            if sub is None:
+                break
+            bindings = {}
+            for slot in sub.program.slots:
+                if slot.name in call.get("bindings", {}):
+                    bindings[slot.name] = call["bindings"][slot.name]
+                elif slot.name in env:
+                    bindings[slot.name] = env[slot.name]
+                else:
+                    candidates = [
+                        (k, v) for k, v in env.items()
+                        if not k.startswith("_") and DType.check(v, slot.dtype)
+                    ]
+                    if candidates:
+                        bindings[slot.name] = candidates[-1][1]
+                    else:
+                        break
+            else:
+                ok, res, call_env = self.executor.execute(sub.program, bindings)
+                if ok:
+                    calls_ok += 1
+                    env.update(call_env)
+                    if res is not None:
+                        output = res
+                        env["__last_output__"] = res
+                    continue
+            break  # execution chain broken
+
+        reward = 0.0
+        reward += 0.25 * calls_ok
+        if calls_ok == len(plan.calls) and calls_ok > 0:
+            reward += 0.10
+        reward -= 0.05 * len(plan.calls)
+        if not type_safe:
+            reward -= 0.10
+
+        # Finite-number bonus (same spirit as MCTS rollout)
+        if output is not None:
+            try:
+                val = float(output)
+                if math.isfinite(val) and abs(val) > 1e-6:
+                    reward += 0.20
+            except (ValueError, TypeError):
+                pass
+
+        return reward
+
+    # -- neighbour generators ----------------------------------------------
+
+    def _substitute_neighbours(self, plan: CompositionPlan) -> List[RepairCandidate]:
+        """Replace one call with every other subroutine in the library."""
+        candidates: List[RepairCandidate] = []
+        for idx, call in enumerate(plan.calls):
+            for sid, sub in self.library.subroutines.items():
+                if sid == call.get("sub_id"):
+                    continue
+                new_bindings = dict(call.get("bindings", {}))
+                # check type compatibility of existing bindings
+                safe = True
+                for slot in sub.program.slots:
+                    if slot.name in new_bindings:
+                        if not DType.check(new_bindings[slot.name], slot.dtype):
+                            safe = False
+                new_calls = list(plan.calls)
+                new_calls[idx] = {"sub_id": sid, "bindings": new_bindings}
+                candidates.append(RepairCandidate(
+                    kind="substitute", position=idx,
+                    plan=CompositionPlan(calls=new_calls), type_safe=safe,
+                ))
+                self.total_nodes += 1
+        return candidates
+
+    def _rebind_neighbours(self, plan: CompositionPlan) -> List[RepairCandidate]:
+        """Change one binding value in one call to another env variable."""
+        candidates: List[RepairCandidate] = []
+        env_vals = list(self.initial_bindings.items())
+        for idx, call in enumerate(plan.calls):
+            sub = self.library.get(call.get("sub_id", ""))
+            if sub is None:
+                continue
+            for slot in sub.program.slots:
+                for var_name, var_val in env_vals:
+                    if var_name == slot.name:
+                        continue
+                    safe = DType.check(var_val, slot.dtype)
+                    new_bindings = dict(call.get("bindings", {}))
+                    new_bindings[slot.name] = var_val
+                    new_calls = list(plan.calls)
+                    new_calls[idx] = {"sub_id": call["sub_id"], "bindings": new_bindings}
+                    candidates.append(RepairCandidate(
+                        kind="rebind", position=idx,
+                        plan=CompositionPlan(calls=new_calls), type_safe=safe,
+                    ))
+                    self.total_nodes += 1
+        return candidates
+
+    def _insert_neighbours(self, plan: CompositionPlan) -> List[RepairCandidate]:
+        """Insert a new subroutine call at every legal position."""
+        if len(plan.calls) >= self.max_calls:
+            return []
+        candidates: List[RepairCandidate] = []
+        for pos in range(len(plan.calls) + 1):
+            for sid, sub in self.library.subroutines.items():
+                bindings: Dict[str, Any] = {}
+                safe = True
+                for slot in sub.program.slots:
+                    if slot.name in self.initial_bindings:
+                        bindings[slot.name] = self.initial_bindings[slot.name]
+                        if not DType.check(bindings[slot.name], slot.dtype):
+                            safe = False
+                    else:
+                        bindings[slot.name] = 0.0
+                        safe = False
+                new_calls = list(plan.calls)
+                new_calls.insert(pos, {"sub_id": sid, "bindings": bindings})
+                candidates.append(RepairCandidate(
+                    kind="insert", position=pos,
+                    plan=CompositionPlan(calls=new_calls), type_safe=safe,
+                ))
+                self.total_nodes += 1
+        return candidates
+
+    def _delete_neighbours(self, plan: CompositionPlan) -> List[RepairCandidate]:
+        """Remove one call from the plan."""
+        candidates: List[RepairCandidate] = []
+        for idx in range(len(plan.calls)):
+            new_calls = list(plan.calls)
+            new_calls.pop(idx)
+            if not new_calls:
+                continue  # must keep at least one call
+            candidates.append(RepairCandidate(
+                kind="delete", position=idx,
+                plan=CompositionPlan(calls=new_calls), type_safe=True,
+            ))
+            self.total_nodes += 1
+        return candidates
+
+    # -- main entry --------------------------------------------------------
+
+    def repair(
+        self, failed_plan: CompositionPlan,
+    ) -> Tuple[CompositionPlan, bool, Dict[str, Any]]:
+        """Try to repair *failed_plan* via bounded beam search.
+
+        Returns ``(repaired_plan, success, repair_stats)``.
+        """
+        self.forward_passes = 0
+        self.executor_calls = 0
+        self.total_nodes = 0
+
+        beam: List[Tuple[float, CompositionPlan]] = [
+            (self._reward(failed_plan, type_safe=True), failed_plan)
+        ]
+        self.forward_passes += 1
+        best_score, best_plan = beam[0]
+
+        for _iteration in range(self.max_iterations):
+            all_candidates: List[RepairCandidate] = []
+            for _score, plan in beam:
+                all_candidates.extend(self._substitute_neighbours(plan))
+                all_candidates.extend(self._rebind_neighbours(plan))
+                all_candidates.extend(self._insert_neighbours(plan))
+                all_candidates.extend(self._delete_neighbours(plan))
+
+            scored: List[Tuple[float, CompositionPlan]] = []
+            for cand in all_candidates:
+                self.forward_passes += 1
+                r = self._reward(cand.plan, cand.type_safe)
+                scored.append((r, cand.plan))
+
+            scored.sort(key=lambda x: x[0], reverse=True)
+            beam = scored[: self.beam_width]
+
+            if beam and beam[0][0] > best_score:
+                best_score, best_plan = beam[0]
+
+            # early exit: full-chain execution succeeds
+            success, result, _ = self.comp_exec.execute(best_plan, self.initial_bindings)
+            self.executor_calls += 1
+            if success and result is not None:
+                try:
+                    val = float(result)
+                    if math.isfinite(val):
+                        return best_plan, True, self._stats()
+                except (ValueError, TypeError):
+                    pass
+
+        # final check
+        success, result, _ = self.comp_exec.execute(best_plan, self.initial_bindings)
+        self.executor_calls += 1
+        ok = False
+        if success and result is not None:
+            try:
+                ok = math.isfinite(float(result))
+            except (ValueError, TypeError):
+                pass
+
+        return best_plan, ok, self._stats()
+
+    def _stats(self) -> Dict[str, Any]:
+        return {
+            "forward_passes": self.forward_passes,
+            "executor_calls": self.executor_calls,
+            "total_nodes": self.total_nodes,
+        }
+
+
+def mcts_solve_with_repair(
+    problem: str,
+    library: SubroutineLibrary,
+    model=None,
+    tokenizer=None,
+    max_simulations: int = 50,
+    max_calls: int = 5,
+    max_repair_attempts: int = 3,
+) -> Tuple[CompositionPlan, Any, Dict]:
+    """Run MCTS; if it fails, attempt beam-search repair on the best plan.
+
+    Returns ``(plan, result, stats)`` where *stats* merges MCTS and repair
+    budget counters for fair baseline comparison.
+    """
+    plan, result, stats = mcts_solve(
+        problem, library, model, tokenizer, max_simulations, max_calls,
+    )
+
+    if stats.get("execution_success"):
+        stats["repair_attempted"] = False
+        return plan, result, stats
+
+    # -- build initial_bindings (same logic as mcts_solve) -----------------
+    raw_numbers = re.findall(r'[\d,]+\.?\d*', problem)
+    numbers: List[float] = []
+    for n in raw_numbers:
+        cleaned = n.replace(",", "").strip()
+        if cleaned:
+            try:
+                numbers.append(float(cleaned))
+            except ValueError:
+                continue
+
+    all_slot_names: List[str] = []
+    for sub in library.subroutines.values():
+        for slot in sub.program.slots:
+            if slot.name not in all_slot_names:
+                all_slot_names.append(slot.name)
+
+    initial_bindings: Dict[str, Any] = {}
+    for j, name in enumerate(all_slot_names):
+        if j < len(numbers):
+            initial_bindings[name] = numbers[j]
+    for j, num in enumerate(numbers):
+        initial_bindings[f"x{j}"] = num
+
+    # -- repair ------------------------------------------------------------
+    repairer = RepairSearcher(
+        library=library,
+        initial_bindings=initial_bindings,
+        max_calls=max_calls,
+        beam_width=4,
+        max_iterations=max_repair_attempts,
+    )
+
+    repaired_plan, success, repair_stats = repairer.repair(plan)
+
+    if success:
+        comp_exec = CompositionExecutor(library, max_calls=max_calls)
+        _, repaired_result, _ = comp_exec.execute(repaired_plan, initial_bindings)
+    else:
+        repaired_plan = plan
+        repaired_result = result
+
+    stats["repair_attempted"] = True
+    stats["repair_success"] = success
+    stats["repair_stats"] = repair_stats
+
+    return repaired_plan, repaired_result, stats
