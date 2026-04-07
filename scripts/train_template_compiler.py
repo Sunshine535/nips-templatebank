@@ -124,13 +124,34 @@ def train(
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.bfloat16,
-        trust_remote_code=True,
-        attn_implementation="sdpa",
-        device_map={"": int(os.environ.get("LOCAL_RANK", 0))},
-    )
+    # Use 4-bit quantization (QLoRA) for large models (>20B params)
+    use_qlora = train_cfg.get("qlora", False)
+    if use_qlora:
+        from transformers import BitsAndBytesConfig
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+        )
+        logger.info("Using QLoRA (4-bit quantization)")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            quantization_config=bnb_config,
+            trust_remote_code=True,
+            attn_implementation="sdpa",
+            device_map="auto",
+        )
+        from peft import prepare_model_for_kbit_training
+        model = prepare_model_for_kbit_training(model)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+            attn_implementation="sdpa",
+            device_map={"": int(os.environ.get("LOCAL_RANK", 0))},
+        )
     model.config.use_cache = False
 
     peft_config = LoraConfig(

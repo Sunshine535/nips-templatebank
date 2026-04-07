@@ -1,0 +1,8 @@
+{
+  "total_programs": 697,
+  "train_programs": 418,
+  "library_size": 16,
+  "plans": 418,
+  "post_split": true,
+  "split_path": "results/mcd_split_v2.json"
+}

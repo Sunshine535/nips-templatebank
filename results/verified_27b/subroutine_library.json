@@ -1,0 +1,106 @@
+{
+  "L00": {
+    "sub_id": "L00",
+    "program": {
+      "program_id": "gsm8k_p77",
+      "slots": [
+        {
+          "name": "initial_weight",
+          "dtype": "int",
+          "description": "The boxer's weight in kg at the start"
+        },
+        {
+          "name": "months_until_fight",
+          "dtype": "int",
+          "description": "Number of months until the fight"
+        },
+        {
+          "name": "weight_loss_per_month",
+          "dtype": "int",
+          "description": "Weight lost per month in kg"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "total_weight_loss",
+          "expr": "months_until_fight * weight_loss_per_month",
+          "inputs": [
+            "months_until_fight",
+            "weight_loss_per_month"
+          ],
+          "target_dtype": "int"
+        },
+        {
+          "op": "compute",
+          "target": "final_weight",
+          "expr": "initial_weight - total_weight_loss",
+          "inputs": [
+            "initial_weight",
+            "total_weight_loss"
+          ],
+          "target_dtype": "int"
+        },
+        {
+          "op": "output",
+          "target": "final_weight",
+          "expr": "final_weight",
+          "inputs": [
+            "final_weight"
+          ],
+          "target_dtype": "int"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 9
+  },
+  "L01": {
+    "sub_id": "L01",
+    "program": {
+      "program_id": "gsm8k_p473",
+      "slots": [
+        {
+          "name": "total_amount",
+          "dtype": "float",
+          "description": "The total amount owned by James and Ali together"
+        },
+        {
+          "name": "difference",
+          "dtype": "float",
+          "description": "The amount James owns more than Ali"
+        },
+        {
+          "name": "james_amount",
+          "dtype": "float",
+          "description": "The amount owned by James"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "james_amount",
+          "expr": "(total_amount + difference) / 2",
+          "inputs": [
+            "total_amount",
+            "difference"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "james_amount",
+          "expr": "james_amount",
+          "inputs": [
+            "james_amount"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 6
+  }
+}

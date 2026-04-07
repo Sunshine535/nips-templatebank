@@ -1,0 +1,12 @@
+{
+  "total_programs": 697,
+  "library_size": 16,
+  "plans": 497,
+  "multi_call_plans": 181,
+  "call_distribution": {
+    "1": 316,
+    "2": 179,
+    "3": 2
+  },
+  "synthetic_used": false
+}
