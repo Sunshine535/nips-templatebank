@@ -3,7 +3,7 @@
 # Run after extraction: bash scripts/run_27b_pipeline.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
-source /home/claude/nips-env/bin/activate
+source "$(dirname "$0")/../.venv/bin/activate"
 
 export WANDB_MODE=disabled
 export TOKENIZERS_PARALLELISM=false
@@ -95,7 +95,7 @@ echo "================================================================"
 # ===== Post-pipeline: Git push + ZIP =====
 echo "========== Post-Pipeline: Push + Package =========="
 
-cd /home/claude/nips-templatebank
+cd "$(dirname "$0")/.."
 
 # Git push
 git add -A
@@ -115,7 +115,7 @@ git push origin main || echo "Push failed - will retry"
 
 # ZIP everything
 echo "Creating ZIP archive..."
-cd /home/claude
+cd "$(dirname "$0")/../.."
 zip -r /workspace/nips-templatebank-full.zip nips-templatebank/ \
     -x "nips-templatebank/.git/*" \
     -x "nips-templatebank/__pycache__/*" \

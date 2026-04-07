@@ -1,126 +1,85 @@
 # Subroutine Composition for Mathematical Reasoning
 
-Can reusable subroutines improve program-compound generalization beyond a strong primitive DSL?
+## 项目简介
 
-We build a typed subroutine library from math CoT traces and train a planner that composes subroutines for new problems. On a CFQ-style MCD split, composition outperforms flat programs on unseen subroutine combinations while using fewer tokens.
+从 GSM8K + MATH 数据集中挖掘类型化子程序库 (typed subroutine library)，训练 planner 模型组合子程序解决数学问题。在 CFQ-style Maximum Compound Divergence (MCD) split 上评估，验证可复用子程序能否改善 program-compound generalization。
 
-## Quick Start
+**Review 状态**: Round 2, Score 3.0/10（需要更多实验数据）
+
+## 环境安装
 
 ```bash
-git clone https://github.com/Sunshine535/nips-templatebank.git
-cd nips-templatebank
+cd /workspace/nips-templatebank
+python3 -m venv .venv
+source .venv/bin/activate
+pip install torch
+pip install transformers datasets accelerate trl peft evaluate wandb \
+    outlines sentence-transformers rank-bm25 numpy scipy matplotlib pandas pyyaml
+```
 
-# Setup environment
-bash setup.sh
+## 快速开始
 
-# Smoke test (fast, uses student model, ~50 examples)
-bash run.sh --smoke
+```bash
+source .venv/bin/activate
 
-# Full pipeline (~1970 GPU-hours on 8xA100)
+# Smoke test（合成数据）
+SMOKE=1 bash run.sh --smoke
+
+# 单独训练 compose planner
+torchrun --nproc_per_node=4 scripts/train_template_compiler.py --mode compose
+
+# 单独训练 flat baseline
+torchrun --nproc_per_node=4 scripts/train_template_compiler.py --mode flat
+```
+
+## 完整实验流程（4 阶段）
+
+```bash
+# 一键全流程
 bash run.sh
+
+# 分步执行：
+# Stage 1: Teacher 抽取程序 + 构建子程序库
+python3 scripts/extract_templates.py --config configs/template_config.yaml
+
+# Stage 2: 构建 MCD split
+python3 scripts/build_mcd_split.py --config configs/template_config.yaml
+
+# Stage 3: 训练（多卡 torchrun）
+torchrun --nproc_per_node=4 scripts/train_template_compiler.py --mode compose
+torchrun --nproc_per_node=4 scripts/train_template_compiler.py --mode flat
+
+# Stage 4: 评估
+python3 scripts/eval_template_reasoning.py --config configs/template_config.yaml
 ```
 
-### Resume After Interruption
+## 断点续训
 
-Re-run `bash run.sh` — completed phases are automatically skipped.
-Force re-run: `FORCE_RERUN=1 bash run.sh`
+- 训练支持 `--resume auto`（自动从最新 checkpoint 恢复）
+- Pipeline 使用 `results/.phase_markers/` 跟踪完成状态
+- 强制重跑：`FORCE_RERUN=1 bash run.sh`
 
-### Check Progress
-
-```bash
-ls results/.phase_markers/     # See completed phases
-cat results/.pipeline_done     # Shows PIPELINE_COMPLETE when done
-```
-
-## Method Overview
+## 项目结构
 
 ```
-Phase 1: Teacher (32B) generates executable JSON-AST programs for GSM8K/MATH
-Phase 2: Mine subroutine library (L=16) by structural clustering + MDL
-Phase 3: Build MCD split (maximize compound divergence, low atom TVD)
-Phase 4a: Train compose planner (9B + LoRA): problem -> composition plan
-Phase 4b: Train flat-program baseline (same DSL, no library calls)
-Phase 5: Evaluate on MCD split + IID split with all baselines
-Phase 6: Library size ablation (L = 4, 8, 16, 32)
+src/
+  template_dsl.py        # 核心 DSL: Program, Step, Op, Subroutine, CompositionPlan
+  mcd_split.py           # CFQ-style MCD split 构建
+  template_algebra.py    # Legacy template algebra
+scripts/
+  extract_templates.py   # Stage 1: Teacher → programs → library
+  build_mcd_split.py     # Stage 2: MCD split
+  train_template_compiler.py  # Stage 3: 训练 (torchrun)
+  eval_template_reasoning.py  # Stage 4: 评估
+configs/
+  template_config.yaml   # 全部配置
+results/                 # 实验结果
 ```
 
-## Project Structure
+## 下一步（达到 6/10 的路径）
 
-```
-nips-templatebank/
-├── src/
-│   ├── template_dsl.py          # Typed DSL: programs, subroutines, executor
-│   ├── mcd_split.py             # CFQ-style MCD split builder
-│   └── template_algebra.py      # Legacy template algebra operations
-├── scripts/
-│   ├── run_all_experiments.sh   # Master pipeline (6 stages)
-│   ├── extract_templates.py     # Stage 1: teacher -> programs -> library
-│   ├── build_mcd_split.py       # Stage 2: MCD split construction
-│   ├── train_template_compiler.py  # Stage 3: planner + flat baseline training
-│   ├── eval_template_reasoning.py  # Stage 4: full evaluation
-│   └── gpu_utils.sh             # GPU auto-detection
-├── configs/
-│   └── template_config.yaml     # All experiment configuration
-├── results/                     # Experiment outputs
-├── logs/                        # Training/eval logs
-└── ARIS_REVIEW.md               # Research review and experiment plan
-```
-
-## Evaluation Methods
-
-| Method | Description |
-|--------|-------------|
-| compose | Our method: planner outputs composition plan using subroutine library |
-| flat_inline | Critical baseline: same DSL, no library calls |
-| direct_cot | Standard chain-of-thought prompting |
-| cot_budget | Compute-matched CoT with majority vote |
-
-## Metrics
-
-- `accuracy`: End-to-end correctness
-- `valid_plan_rate`: Fraction of outputs that parse as valid plans/programs
-- `execution_success`: Fraction that execute without errors
-- `fallback_rate`: Fraction routed to CoT fallback
-- `fallback_free_accuracy`: Accuracy excluding fallback cases
-- `total_tokens`: Average tokens per problem
-- `latency`: Wall-clock time per problem
-
-## Key Design Decisions
-
-1. **Same DSL for compose and flat** — isolates the composition benefit
-2. **Opaque subroutine IDs** (L00-L15) — no information leakage from names
-3. **MCD split** — maximizes unseen compound divergence while keeping atom distribution similar
-4. **Deterministic executor** — all programs are executable, not just text
-5. **Fallback pipeline** — CoT fallback when plans fail (tracked separately)
-
-## Compute Budget
-
-| Stage | Description | Est. GPU-hours |
-|-------|-------------|----------------|
-| 1 | Program extraction (32B teacher) | ~220 |
-| 2 | MCD split construction | ~10 |
-| 3a | Compose planner training | ~300 |
-| 3b | Flat baseline training | ~300 |
-| 4 | Full evaluation | ~240 |
-| 5 | Library size ablation | ~220 |
-| | **Total** | **~1290** |
-
-## Models
-
-- **Teacher**: Qwen/Qwen3.5-32B (program extraction only)
-- **Planner/Baseline**: Qwen/Qwen3.5-9B + LoRA (r=64, α=128)
-
-## Citation
-
-```bibtex
-@inproceedings{subroutinecomposition2026neurips,
-  title     = {Subroutine Composition for Mathematical Reasoning},
-  author    = {Anonymous},
-  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
-  year      = {2026}
-}
-```
-
-## License
-
-MIT License — see [LICENSE](LICENSE) for details.
+1. 1k+ gold-verified GSM8K programs
+2. Real MCD split with unseen compounds > 0
+3. Compose > flat by >= 5 absolute points
+4. 3 seeds with confidence intervals
+5. 一键可复现

@@ -2,7 +2,7 @@
 # Run after extraction completes to check go/no-go gate
 set -euo pipefail
 cd "$(dirname "$0")/.."
-source /home/claude/nips-env/bin/activate
+source "$(dirname "$0")/../.venv/bin/activate"
 
 TEMPLATE_DIR="results/templates_full"
 VERIFIED_DIR="results/templates_verified"
