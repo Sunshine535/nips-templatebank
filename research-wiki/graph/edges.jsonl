@@ -1,0 +1,32 @@
+{"from": "paper:zhang2026_agentic_proposing", "to": "paper:yang2025_reasonflux", "type": "extends", "note": "extends template idea to compositional skills with RL"}
+{"from": "paper:t3rl2026_tool_verification", "to": "paper:ttrl2025_test_time_rl", "type": "extends", "note": "adds tool verification to TTRL pseudo-labels"}
+{"from": "paper:t3rl2026_tool_verification", "to": "paper:deepseek2025_r1", "type": "extends", "note": "uses verifiable rewards at test time"}
+{"from": "paper:neurips2025_rl_reasoning_debate", "to": "paper:deepseek2025_r1", "type": "contradicts", "note": "questions whether RLVR truly expands capability"}
+{"from": "paper:neurips2025_rl_reasoning_debate", "to": "paper:rlvr_incentivizes_2025", "type": "contradicts", "note": "opposing conclusions on capability expansion"}
+{"from": "paper:theorycoder2_2026", "to": "paper:lilo2024_library_learning", "type": "extends", "note": "auto-learns abstractions like LILO but for RL planning"}
+{"from": "paper:du2025_compositional_energy", "to": "gap:G2", "type": "addresses_gap", "note": "compositional energy for combinatorial but NOT math"}
+{"from": "paper:yang2025_reasonflux", "to": "gap:G7", "type": "addresses_gap", "note": "uses templates but no MCD evaluation — gap persists"}
+{"from": "paper:zhang2026_agentic_proposing", "to": "gap:G8", "type": "addresses_gap", "note": "compositional skills but unverified — gap persists"}
+{"from": "paper:t3rl2026_tool_verification", "to": "gap:G4", "type": "addresses_gap", "note": "tool verification at test time, but no tool BUILDING"}
+{"from": "paper:rlvr_incentivizes_2025", "to": "gap:G5", "type": "addresses_gap", "note": "studies flat CoT only — compositional gap remains"}
+{"from": "paper:neurips2025_rl_reasoning_debate", "to": "gap:G5", "type": "addresses_gap", "note": "studies flat CoT only — compositional gap remains"}
+{"from": "paper:deepseek2025_r1", "to": "gap:G3", "type": "addresses_gap", "note": "GRPO exists but not connected to library learning"}
+{"from": "paper:lilo2024_library_learning", "to": "gap:G1", "type": "addresses_gap", "note": "library learning exists but frozen, toy domain, no self-evolution"}
+{"from": "paper:tool_superintelligence_2026", "to": "gap:G4", "type": "addresses_gap", "note": "theoretical motivation for tool building, no implementation"}
+{"from": "paper:guan2025_rstar_math", "to": "paper:deepseek2025_r1", "type": "extends", "note": "both use self-play/RL but rStar adds MCTS structure"}
+{"from": "idea:001_seval", "to": "paper:deepseek2025_r1", "type": "inspired_by", "note": "GRPO as library evolution optimizer"}
+{"from": "idea:001_seval", "to": "paper:t3rl2026_tool_verification", "type": "inspired_by", "note": "tool verification for test-time building"}
+{"from": "idea:001_seval", "to": "paper:lilo2024_library_learning", "type": "inspired_by", "note": "MDL-based library learning foundation"}
+{"from": "idea:001_seval", "to": "paper:rlvr_incentivizes_2025", "type": "inspired_by", "note": "RLVR capability expansion evidence"}
+{"from": "idea:001_seval", "to": "paper:neurips2025_rl_reasoning_debate", "type": "inspired_by", "note": "open question we aim to answer"}
+{"from": "idea:001_seval", "to": "paper:theorycoder2_2026", "type": "inspired_by", "note": "auto-learning abstractions concept"}
+{"from": "idea:001_seval", "to": "gap:G1", "type": "addresses_gap", "note": "self-evolving verified library"}
+{"from": "idea:001_seval", "to": "gap:G3", "type": "addresses_gap", "note": "connects RLVR + library learning"}
+{"from": "idea:001_seval", "to": "gap:G4", "type": "addresses_gap", "note": "test-time tool building"}
+{"from": "idea:001_seval", "to": "gap:G5", "type": "addresses_gap", "note": "compositional RL expansion evidence"}
+{"from": "idea:001_seval", "to": "gap:G7", "type": "addresses_gap", "note": "MCD evaluation"}
+{"from": "idea:001_seval", "to": "gap:G8", "type": "addresses_gap", "note": "verified compositional skills"}
+{"from": "claim:C1", "to": "idea:001_seval", "type": "tested_by", "note": "library evolution vs frozen"}
+{"from": "claim:C2", "to": "idea:001_seval", "type": "tested_by", "note": "RLVR compositional expansion"}
+{"from": "claim:C3", "to": "idea:001_seval", "type": "tested_by", "note": "test-time tool building"}
+{"from": "claim:C4", "to": "idea:001_seval", "type": "tested_by", "note": "cross-model transfer"}

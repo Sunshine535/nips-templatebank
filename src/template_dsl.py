@@ -143,11 +143,25 @@ class Executor:
     """Deterministic executor for DSL programs."""
 
     SAFE_BUILTINS = {
+        # Basic
         "abs": abs, "round": round, "min": min, "max": max,
         "sum": sum, "len": len, "int": int, "float": float,
-        "pow": pow, "sqrt": math.sqrt, "ceil": math.ceil, "floor": math.floor,
-        "log": math.log, "log10": math.log10,
-        "True": True, "False": False,
+        "bool": bool, "str": str,
+        # Arithmetic
+        "pow": pow, "divmod": divmod,
+        # Math (algebra, precalculus)
+        "sqrt": math.sqrt, "ceil": math.ceil, "floor": math.floor,
+        "log": math.log, "log2": math.log2, "log10": math.log10, "exp": math.exp,
+        # Trigonometry (precalculus, geometry)
+        "sin": math.sin, "cos": math.cos, "tan": math.tan,
+        "asin": math.asin, "acos": math.acos, "atan": math.atan, "atan2": math.atan2,
+        "pi": math.pi, "e": math.e,
+        # Combinatorics (counting_and_probability)
+        "factorial": math.factorial, "comb": math.comb, "perm": math.perm,
+        # Number theory
+        "gcd": math.gcd,
+        # Constants
+        "True": True, "False": False, "inf": math.inf,
     }
 
     def __init__(self, max_steps: int = 100):
@@ -264,6 +278,66 @@ class SubroutineLibrary:
             "avg_steps": sum(steps) / len(steps),
             "total_support": sum(supports),
         }
+
+    # -- Library Evolution API (SEVAL) ------------------------------------
+
+    def next_id(self) -> str:
+        """Generate next available subroutine ID."""
+        existing = [int(s.sub_id[1:]) for s in self.subroutines.values()
+                    if s.sub_id.startswith("L") and s.sub_id[1:].isdigit()]
+        next_num = max(existing, default=-1) + 1
+        return f"L{next_num:02d}"
+
+    def mint_subroutine(
+        self, program: "Program", support: int = 0, mdl_gain: float = 0.0,
+    ) -> Optional[Subroutine]:
+        """Create and add a new verified subroutine to the library.
+
+        Returns the subroutine if successfully added (not a duplicate), else None.
+        """
+        fp = program.fingerprint()
+        if fp in self._fp_index:
+            self.subroutines[self._fp_index[fp]].support += support
+            return None
+        sub = Subroutine(
+            sub_id=self.next_id(), program=program,
+            support=support, mdl_gain=mdl_gain,
+        )
+        self.subroutines[sub.sub_id] = sub
+        self._fp_index[fp] = sub.sub_id
+        return sub
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Serializable snapshot for evolution logging."""
+        return {
+            "size": self.size,
+            "ids": sorted(self.subroutines.keys()),
+            "total_support": sum(s.support for s in self.subroutines.values()),
+            "avg_mdl_gain": (
+                sum(s.mdl_gain for s in self.subroutines.values()) / self.size
+                if self.size > 0 else 0.0
+            ),
+        }
+
+    def diversity_score(self) -> float:
+        """Measure library diversity via fingerprint entropy."""
+        if self.size <= 1:
+            return 0.0
+        fps = [s.program.fingerprint() for s in self.subroutines.values()]
+        unique = len(set(fps))
+        return unique / len(fps)
+
+    def prune_low_quality(self, min_support: int = 2, min_mdl_gain: float = 0.0) -> int:
+        """Remove subroutines below quality thresholds. Returns count removed."""
+        to_remove = [
+            sid for sid, sub in self.subroutines.items()
+            if sub.support < min_support or sub.mdl_gain < min_mdl_gain
+        ]
+        for sid in to_remove:
+            fp = self.subroutines[sid].program.fingerprint()
+            del self.subroutines[sid]
+            self._fp_index.pop(fp, None)
+        return len(to_remove)
 
 
 @dataclass
