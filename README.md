@@ -6,11 +6,11 @@ Compression-mined, execution-verified subroutine libraries that transfer across 
 
 ```bash
 git clone <this-repo> && cd nips-templatebank
-bash setup.sh            # conda env 'templatebank' + Python 3.11 + PyTorch (CUDA 12.8)
-conda activate templatebank
+bash setup.sh            # venv + PyTorch (CUDA 12.8) + all deps
+source .venv/bin/activate
 ```
 
-**Requirements**: Python 3.11 (conda), PyTorch (CUDA 12.8), 1+ NVIDIA GPU (auto-detected).
+**Requirements**: Python >= 3.10, PyTorch (CUDA 12.8), 1+ NVIDIA GPU (auto-detected).
 
 ## GPU Auto-Detection
 
