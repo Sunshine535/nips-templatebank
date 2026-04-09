@@ -49,7 +49,7 @@ fi
 
 echo "================================================================"
 echo "  Subroutine Composition — Full Experiment Pipeline"
-echo "  Planner: Qwen/Qwen3.5-9B | Teacher: Qwen/Qwen3.5-32B"
+echo "  Planner: Qwen/Qwen3.5-9B | Teacher: Qwen/Qwen3.5-27B"
 echo "  GPUs: ${NUM_GPUS} | Smoke: ${SMOKE}"
 echo "================================================================"
 

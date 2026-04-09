@@ -31,7 +31,7 @@ The pipeline has 7 stages. GPU hours estimated for 4x H100 80GB.
 
 ### Stage 1: Teacher Program Extraction (~180 GPU-h)
 
-Extract verified DSL programs from GSM8K using Qwen3.5-32B:
+Extract verified DSL programs from GSM8K using Qwen3.5-27B:
 
 ```bash
 python scripts/extract_templates.py \
@@ -98,7 +98,7 @@ torchrun --nproc_per_node=$NUM_GPUS scripts/train_template_compiler.py \
 
 # CoT-distilled baseline (primary comparison)
 python scripts/generate_cot_distill_data.py \
-  --teacher_model Qwen/Qwen3.5-32B \
+  --teacher_model Qwen/Qwen3.5-27B \
   --dataset gsm8k \
   --split results/gsm8k_mcd_split_seed42.json \
   --output results/gsm8k_cot_distill_seed42.json
@@ -196,9 +196,9 @@ refine-logs/
 
 | Role | Model | Usage |
 |------|-------|-------|
-| Teacher | Qwen/Qwen3.5-32B | Program extraction + library mining |
+| Teacher | Qwen/Qwen3.5-27B | Program extraction + library mining |
 | Student A | Qwen/Qwen3.5-9B | Compose/flat planner (LoRA r=32, α=64) |
-| Student B | Qwen/Qwen3.5-3B | Portability test |
+| Student B | Qwen/Qwen3.5-4B | Portability test |
 
 ## Claims
 

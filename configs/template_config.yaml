@@ -1,5 +1,5 @@
 teacher:
-  model: "Qwen/Qwen3.5-32B"
+  model: "Qwen/Qwen3.5-27B"
   enable_thinking: false
   temperature: 0.2
   top_p: 0.95

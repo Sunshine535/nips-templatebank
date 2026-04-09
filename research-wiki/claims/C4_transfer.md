@@ -9,7 +9,7 @@ created_at: 2026-04-09T00:00:00Z
 
 # C4: Evolved library transfers to smaller model, beating CoT-distilled baseline
 
-**Formal statement**: Frozen evolved library L_final transferred to Qwen3.5-3B (no reminting) improves over CoT-distilled 3B baseline by ≥8 accuracy points on MATH MCD-hard.
+**Formal statement**: Frozen evolved library L_final transferred to Qwen3.5-4B (no reminting) improves over CoT-distilled 3B baseline by ≥8 accuracy points on MATH MCD-hard.
 
 **Evidence needed**: Phase 3 transfer evaluation, 3 seeds.
 

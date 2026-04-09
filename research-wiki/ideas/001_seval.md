@@ -28,7 +28,7 @@ Question: Can a verified executable library of typed DSL subroutines, mined from
 ## Method
 
 ### Phase 0: Seed Library Mining (existing infrastructure)
-- Teacher (Qwen3.5-32B) generates typed DSL programs for MATH
+- Teacher (Qwen3.5-27B) generates typed DSL programs for MATH
 - Step-level verification: parse → type-check → execute → answer-check → perturbation-robustness
 - MDL-based subroutine extraction → initial frozen library L₀ (K=16 subroutines)
 - MCD split construction for compositional evaluation
@@ -58,7 +58,7 @@ Question: Can a verified executable library of typed DSL subroutines, mined from
 
 ### Phase 3: Transfer & Generalization (enhanced from original)
 - Freeze evolved library L_final
-- Transfer to Student B (Qwen3.5-3B) — NO student-specific reminting
+- Transfer to Student B (Qwen3.5-4B) — NO student-specific reminting
 - Evaluate on MCD-hard splits (compositional generalization)
 - Evaluate on AIME 2024/2025 subset (competitive math, stretch goal)
 
@@ -74,7 +74,7 @@ In library-composition settings, RLVR-trained student achieves higher CoT-Pass@K
 Per-problem tool building at inference recovers ≥20% of initially failed compositions under matched compute budget (equalized forward passes + executor calls). Must beat test-time search without tool building by ≥5 pts.
 
 ### Claim C4: Evolved Library Transfers Cross-Model
-Frozen evolved library L_final, when transferred to Qwen3.5-3B without reminting, improves over CoT-distilled 3B baseline by ≥8 pts on MATH MCD-hard.
+Frozen evolved library L_final, when transferred to Qwen3.5-4B without reminting, improves over CoT-distilled 3B baseline by ≥8 pts on MATH MCD-hard.
 
 ## Key Differentiators from Competitors
 

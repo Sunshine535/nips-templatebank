@@ -2,9 +2,9 @@
 
 ## Scope
 **Title**: Self-Evolving Verified Abstraction Libraries (SEVAL)
-**Teacher**: Qwen3.5-32B
+**Teacher**: Qwen3.5-27B
 **Student A**: Qwen3.5-9B (RLVR evolution target)
-**Student B**: Qwen3.5-3B (transfer test)
+**Student B**: Qwen3.5-4B (transfer test)
 **Benchmark**: MATH (primary), GSM8K (secondary)
 **Hardware**: 4× H100 80GB for 5 weeks
 **Budget**: 1828 GPUh planned, 200 GPUh contingency
@@ -24,7 +24,7 @@
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/extract_templates.py \
   --config configs/template_config.yaml \
-  --teacher_model Qwen/Qwen3.5-32B \
+  --teacher_model Qwen/Qwen3.5-27B \
   --dataset math \
   --samples_per_example 6 \
   --output_dir results/math_teacher_verified/
@@ -83,7 +83,7 @@ done
 ```bash
 # Generate CoT distillation data
 python scripts/generate_cot_distill_data.py \
-  --teacher_model Qwen/Qwen3.5-32B \
+  --teacher_model Qwen/Qwen3.5-27B \
   --dataset math \
   --split results/math_mcd_split_seed42.json \
   --output results/math_cot_distill_seed42.json
@@ -99,7 +99,7 @@ done
 # Train 3B CoT baseline (3 seeds)
 for SEED in 42 123 456; do
   torchrun --nproc_per_node=4 scripts/train_cot_student.py \
-    --model Qwen/Qwen3.5-3B \
+    --model Qwen/Qwen3.5-4B \
     --train_file results/math_cot_distill_seed${SEED}.json \
     --output_dir results/cot_3b/seed${SEED}
 done
@@ -160,7 +160,7 @@ for SEED in 42 123 456; do
   torchrun --nproc_per_node=4 scripts/train_template_compiler.py \
     --mode compose \
     --library results/seval/seed${SEED}/library_final.json \
-    --student_model Qwen/Qwen3.5-3B \
+    --student_model Qwen/Qwen3.5-4B \
     --output_dir results/transfer_3b/seed${SEED}
 done
 ```

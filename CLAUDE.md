@@ -6,9 +6,9 @@
 
 ## Key models
 
-- `Qwen/Qwen3.5-32B` — Teacher (program extraction + library mining)
+- `Qwen/Qwen3.5-27B` — Teacher (program extraction + library mining)
 - `Qwen/Qwen3.5-9B` — Student A / Planner (LoRA r=32, α=64)
-- `Qwen/Qwen3.5-3B` or `Llama-3-8B-Instruct` — Student B (portability test)
+- `Qwen/Qwen3.5-4B` or `Llama-3-8B-Instruct` — Student B (portability test)
 
 ## Key datasets
 

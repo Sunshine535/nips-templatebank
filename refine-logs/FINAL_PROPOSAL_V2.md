@@ -7,7 +7,7 @@ Can a verified executable library of typed DSL subroutines, mined from a teacher
 1. **C1 — Library Evolution**: RLVR-evolved library L_final outperforms frozen L₀ by ≥10 accuracy points on MATH MCD-hard (Qwen3.5-9B), 95% bootstrap CI excluding 0.
 2. **C2 — RLVR Expands Compositional Reasoning**: CoT-Pass@64 of RLVR-evolved student exceeds **SFT-trained student** (matched data + compute) on MATH MCD-hard, providing first evidence that RL expands (not just optimizes) compositional reasoning. Three-way comparison: base vs SFT vs RLVR. Positive for ≥2/3 seeds.
 3. **C3 — Test-Time Tool Building**: Per-problem tool building recovers ≥20% of initially failed compositions under matched compute budget.
-4. **C4 — Cross-Model Transfer**: Frozen evolved library transferred to Qwen3.5-3B (no reminting) beats CoT-distilled 3B baseline by ≥8 pts on MATH MCD-hard.
+4. **C4 — Cross-Model Transfer**: Frozen evolved library transferred to Qwen3.5-4B (no reminting) beats CoT-distilled 3B baseline by ≥8 pts on MATH MCD-hard.
 
 Not claimed: universal reasoning; a "compression law"; search with privileged labels.
 
@@ -22,7 +22,7 @@ Not claimed: universal reasoning; a "compression law"; search with privileged la
 - `Executor`: deterministic step-by-step execution with type checking
 
 ### Phase 0: Seed Library Mining
-Same as v1: Qwen3.5-32B generates DSL programs → step-level verification → MDL-based subroutine extraction → frozen initial library L₀ (K=16).
+Same as v1: Qwen3.5-27B generates DSL programs → step-level verification → MDL-based subroutine extraction → frozen initial library L₀ (K=16).
 
 ### Phase 1: RLVR-Driven Library Evolution (NEW — src/rlvr_evolution.py)
 1. Student (Qwen3.5-9B) generates composition plans via GRPO
@@ -52,7 +52,7 @@ Budget: max 3 new tools, max 10 verification attempts per problem.
 
 ### Phase 3: Transfer & Generalization
 - Freeze evolved library L_final
-- Transfer to Student B (Qwen3.5-3B) — no reminting
+- Transfer to Student B (Qwen3.5-4B) — no reminting
 - Evaluate on MCD splits with full protocol
 - Compare: evolved vs frozen vs CoT-distilled
 

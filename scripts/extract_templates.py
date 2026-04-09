@@ -3,7 +3,7 @@
 
 Pipeline:
 1. Load GSM8K/MATH train data
-2. Teacher (Qwen3.5-32B) generates K candidate JSON-AST programs per problem
+2. Teacher (Qwen3.5-27B) generates K candidate JSON-AST programs per problem
 3. Filter: JSON valid + types valid + executor produces correct answer
 4. Select shortest valid program
 5. Abstract valid programs -> typed subroutines (values -> slots)
