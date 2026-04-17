@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Download all datasets + models for SEVAL project
+# Download all datasets + models for SEVAL project (CN-mirror defaults)
 # -----------------------------------------------------------------------------
-# Usage (on download container with internet, e.g. /openbayes/input/input0):
-#   git clone https://github.com/Sunshine535/nips-templatebank.git
+# Usage (on download container, e.g. /openbayes/input/input0):
+#   # Clone via ghfast mirror (or direct github if reachable)
+#   git clone https://ghfast.top/https://github.com/Sunshine535/nips-templatebank.git
 #   cd nips-templatebank
 #   bash scripts/download_assets.sh
 #
@@ -16,6 +17,10 @@
 #   assets/models/Qwen3.5-27B/
 #   assets/models/Qwen3.5-9B/
 #   assets/models/Qwen3.5-4B/
+#
+# Override mirrors if needed:
+#   HF_ENDPOINT=https://huggingface.co bash scripts/download_assets.sh
+#   PIP_INDEX=https://pypi.org/simple  bash scripts/download_assets.sh
 # =============================================================================
 
 set -euo pipefail
@@ -27,28 +32,36 @@ MODELS_DIR="$ASSETS_DIR/models"
 
 mkdir -p "$DATASETS_DIR" "$MODELS_DIR"
 
-# Use HF_ENDPOINT mirror if set (e.g. https://hf-mirror.com for users in CN)
-# export HF_ENDPOINT="${HF_ENDPOINT:-https://huggingface.co}"
+# --- Mirrors (CN defaults; override via env) -------------------------------
+export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
+PIP_INDEX="${PIP_INDEX:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 
 # Optional: set HF_TOKEN for higher rate limits
 # export HF_TOKEN="..."
 
 echo "============================================================"
-echo " SEVAL Asset Download"
-echo " Project: $PROJECT_DIR"
-echo " Assets:  $ASSETS_DIR"
-echo " HF endpoint: ${HF_ENDPOINT:-https://huggingface.co (default)}"
-echo " Time:    $(date)"
+echo " SEVAL Asset Download (CN mirrors)"
+echo " Project:      $PROJECT_DIR"
+echo " Assets:       $ASSETS_DIR"
+echo " HF endpoint:  $HF_ENDPOINT"
+echo " PIP index:    $PIP_INDEX"
+echo " Time:         $(date)"
 echo "============================================================"
 
 # --- Ensure huggingface_hub is installed -----------------------------------
 if ! python3 -c "import huggingface_hub" 2>/dev/null; then
-    echo "[setup] Installing huggingface_hub + hf_transfer..."
-    pip install -q huggingface_hub hf_transfer datasets
+    echo "[setup] Installing huggingface_hub + hf_transfer via $PIP_INDEX ..."
+    pip install -q -i "$PIP_INDEX" huggingface_hub hf_transfer datasets
 fi
 
-# Enable fast downloads via hf_transfer (uses Rust client for parallelism)
-export HF_HUB_ENABLE_HF_TRANSFER=1
+# hf-mirror.com does NOT support hf_transfer; disable it when using the mirror
+if [[ "$HF_ENDPOINT" == *"hf-mirror.com"* ]]; then
+    export HF_HUB_ENABLE_HF_TRANSFER=0
+    echo "[setup] Using hf-mirror.com -> hf_transfer disabled (not supported)"
+else
+    export HF_HUB_ENABLE_HF_TRANSFER=1
+    echo "[setup] hf_transfer enabled for parallel downloads"
+fi
 
 # --- Helper: skip if already downloaded ------------------------------------
 already_downloaded() {
