@@ -2,11 +2,13 @@
 # =============================================================================
 # Download all datasets + models for SEVAL project (CN-mirror defaults)
 # -----------------------------------------------------------------------------
-# Usage (on download container, e.g. /openbayes/input/input0):
+# Usage (on download container with internet):
 #   # Clone via ghfast mirror (or direct github if reachable)
 #   git clone https://ghfast.top/https://github.com/Sunshine535/nips-templatebank.git
 #   cd nips-templatebank
 #   bash scripts/download_assets.sh
+#
+# Assets are saved to ./assets/ (relative to this repo's root).
 #
 # After download completes:
 #   rsync -avP assets/ user@tju-hpc:/path/to/project/assets/
