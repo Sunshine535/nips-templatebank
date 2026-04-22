@@ -1,0 +1,23 @@
+{
+  "round": 1,
+  "threadId": "019db66b-f612-7c01-86d8-56f4e043e209",
+  "status": "in_progress",
+  "difficulty": "nightmare",
+  "last_score": 2.0,
+  "last_verdict": "not ready",
+  "pending_experiments": ["phase0_extraction"],
+  "strategy": "flat_program_grpo",
+  "timestamp": "2026-04-23T02:30:00Z",
+  "actions_taken": [
+    "Fixed 3 binding bugs in extraction pipeline",
+    "Rewrote train_seval.py with correct data schema and reward",
+    "Pivoted from composition to flat program GRPO",
+    "Phase 0 extraction running on pod"
+  ],
+  "next_steps": [
+    "Wait for Phase 0 extraction to complete",
+    "Run SFT on verified programs",
+    "Run GRPO with execution reward",
+    "Evaluate GRPO vs SFT (pass@1 and pass@K)"
+  ]
+}
