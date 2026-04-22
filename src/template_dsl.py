@@ -405,14 +405,13 @@ class CompositionExecutor:
                 elif slot.name in env:
                     call_bindings[slot.name] = env[slot.name]
                 else:
-                    candidates = [(k, v) for k, v in env.items() if DType.check(v, slot.dtype)]
+                    candidates = [(k, v) for k, v in env.items()
+                                  if DType.check(v, slot.dtype) and not k.startswith("__")]
                     if len(candidates) == 1:
                         call_bindings[slot.name] = candidates[0][1]
-                    elif candidates:
-                        call_bindings[slot.name] = candidates[-1][1]
                     else:
                         stats["calls_failed"] += 1
-                        return False, None, {**stats, "error": f"Cannot bind slot '{slot.name}' in call to '{sub_id}'"}
+                        return False, None, {**stats, "error": f"Cannot bind slot '{slot.name}' in '{sub_id}': {len(candidates)} candidates"}
 
             stats["calls_made"] += 1
             success, result, call_env = self.executor.execute(sub.program, call_bindings)

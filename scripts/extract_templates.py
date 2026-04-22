@@ -295,29 +295,29 @@ def build_subroutine_library(programs: list, config: dict) -> SubroutineLibrary:
     """Mine subroutines from programs by structural clustering."""
     lib = SubroutineLibrary()
     lib_cfg = config["library"]
-    target_size = lib_cfg["main_size"]
+    target_size = lib_cfg.get("main_size", 16)
 
-    min_support_gsm8k = lib_cfg.get("min_support_gsm8k", 5)
+    min_support_gsm8k = lib_cfg.get("min_support_gsm8k", 3)
     min_support_math = lib_cfg.get("min_support_math", min_support_gsm8k)
 
-    # Group programs by expression-level signature (richer than just op type)
-    # This captures the arithmetic operators used in each step, not just "compute"
+    # Group programs by expression-level signature + slot count
     fp_groups = defaultdict(list)
     source_groups = defaultdict(lambda: defaultdict(int))
     for item in programs:
         prog = Program.from_dict(item["program"])
         steps_sig = _program_signature(prog.steps)
-        fp_groups[steps_sig].append(prog)
-        source_groups[steps_sig][item.get("source", "gsm8k")] += 1
+        n_slots = len(prog.slots)
+        key = (steps_sig, n_slots)
+        fp_groups[key].append(prog)
+        source_groups[key][item.get("source", "gsm8k")] += 1
 
     sorted_groups = sorted(fp_groups.items(), key=lambda x: len(x[1]), reverse=True)
 
     sub_counter = 0
-    for sig, progs in sorted_groups:
+    for key, progs in sorted_groups:
         if lib.size >= target_size:
             break
-        # Apply source-appropriate min_support threshold
-        src_counts = source_groups[sig]
+        src_counts = source_groups[key]
         primary_source = max(src_counts, key=src_counts.get) if src_counts else "gsm8k"
         min_support = min_support_math if primary_source == "math" else min_support_gsm8k
         if len(progs) < min_support:
@@ -334,14 +334,93 @@ def build_subroutine_library(programs: list, config: dict) -> SubroutineLibrary:
         if lib.add(sub):
             sub_counter += 1
 
-    logger.info("Built subroutine library: %d subroutines", lib.size)
+    # Also mine common subsequences for multi-call plans
+    if lib.size < target_size:
+        existing_sigs = {_program_signature(s.program.steps) for s in lib.subroutines.values()}
+        for subseq_len in [2, 3]:
+            subseq_groups = defaultdict(list)
+            for item in programs:
+                prog = Program.from_dict(item["program"])
+                if len(prog.steps) <= subseq_len:
+                    continue
+                for start in range(len(prog.steps) - subseq_len + 1):
+                    subseq = prog.steps[start:start + subseq_len]
+                    if subseq[-1].op == Op.OUTPUT:
+                        continue
+                    sig = _program_signature(subseq)
+                    if sig in existing_sigs:
+                        continue
+                    used_inputs = set()
+                    targets_so_far = set()
+                    for s in subseq:
+                        used_inputs.update(v for v in s.inputs if v not in targets_so_far)
+                        targets_so_far.add(s.target)
+                    n_inputs = len(used_inputs)
+                    subseq_groups[(sig, n_inputs)].append((prog, start))
+
+            for (sig, n_inputs), instances in sorted(
+                subseq_groups.items(), key=lambda x: len(x[1]), reverse=True
+            ):
+                if lib.size >= target_size:
+                    break
+                if len(instances) < min_support_gsm8k:
+                    continue
+                prog, offset = instances[0]
+                subseq = prog.steps[offset:offset + subseq_len]
+                used_inputs = set()
+                targets_so_far = set()
+                for s in subseq:
+                    used_inputs.update(v for v in s.inputs if v not in targets_so_far)
+                    targets_so_far.add(s.target)
+                sub_slots = [slot for slot in prog.slots if slot.name in used_inputs]
+                sub_prog = Program(f"subseq_{sub_counter}", sub_slots, list(subseq))
+                sub_id = f"L{sub_counter:02d}"
+                sub = Subroutine(
+                    sub_id=sub_id,
+                    program=sub_prog,
+                    support=len(instances),
+                    mdl_gain=len(instances) * subseq_len,
+                )
+                if lib.add(sub):
+                    sub_counter += 1
+                    existing_sigs.add(sig)
+
+    logger.info("Built subroutine library: %d subroutines (full-program + subsequence mining)", lib.size)
     return lib
+
+
+def _find_matching_bindings(subroutine, values, expected_answer, executor):
+    """Try permutations of values to find the binding that produces the correct answer."""
+    from itertools import permutations as _perms
+    from math import factorial
+
+    sub_slots = subroutine.program.slots
+    n_slots = len(sub_slots)
+    if not values or n_slots == 0:
+        return None
+    if len(values) < n_slots:
+        return None
+    n_perms = factorial(len(values)) // factorial(len(values) - n_slots)
+    if n_perms > 2000:
+        bindings = {slot.name: values[j] for j, slot in enumerate(sub_slots) if j < len(values)}
+        success, result, _ = executor.execute(subroutine.program, bindings)
+        if success and result is not None and _answer_matches(str(result), str(expected_answer)):
+            return bindings
+        return None
+    for perm in _perms(values, n_slots):
+        bindings = {slot.name: val for slot, val in zip(sub_slots, perm)}
+        success, result, _ = executor.execute(subroutine.program, bindings)
+        if success and result is not None and _answer_matches(str(result), str(expected_answer)):
+            return bindings
+    return None
 
 
 def build_composition_plans(programs: list, library: SubroutineLibrary) -> list:
     """Decompose each program into multi-call composition plans via greedy covering."""
+    executor = Executor()
     plans = []
     call_counts = []
+    binding_found, binding_missed = 0, 0
     for item in programs:
         prog = Program.from_dict(item["program"])
         steps = prog.steps
@@ -353,35 +432,48 @@ def build_composition_plans(programs: list, library: SubroutineLibrary) -> list:
                 sub_steps = sub.program.steps
                 sub_len = len(sub_steps)
                 if i + sub_len <= len(steps):
-                    # Match by op-type signature (structural, not expression-level)
-                    # The planner learns to map problems to subroutines;
-                    # expression differences are handled by slot bindings
                     prog_ops = tuple(s.op.value for s in steps[i:i + sub_len])
                     sub_ops = tuple(s.op.value for s in sub_steps)
                     if prog_ops == sub_ops and sub_len > best_len:
                         best_sub = sub
                         best_len = sub_len
             if best_sub is not None:
-                # Extract bindings for this call from the program's slots
-                call_bindings = {}
-                for slot in best_sub.program.slots:
-                    if slot.name in item.get("bindings", {}):
-                        call_bindings[slot.name] = item["bindings"][slot.name]
+                prog_bindings = item.get("bindings", {})
+                values = list(prog_bindings.values())
+                call_bindings = _find_matching_bindings(
+                    best_sub, values, item.get("answer", item.get("exec_result", "")), executor
+                )
+                if call_bindings is not None:
+                    binding_found += 1
+                else:
+                    binding_missed += 1
+                    call_bindings = {
+                        slot.name: values[j] if j < len(values) else 0
+                        for j, slot in enumerate(best_sub.program.slots)
+                    }
                 calls.append({"sub_id": best_sub.sub_id, "bindings": call_bindings})
                 i += best_len
             else:
-                i += 1  # skip unmatched step
+                i += 1
 
         if not calls:
-            # Fallback: use first subroutine
             first_sub = list(library.subroutines.values())[0]
-            calls = [{"sub_id": first_sub.sub_id, "bindings": item.get("bindings", {})}]
+            prog_bindings = item.get("bindings", {})
+            values = list(prog_bindings.values())
+            call_bindings = _find_matching_bindings(
+                first_sub, values, item.get("answer", item.get("exec_result", "")), executor
+            )
+            if call_bindings is None:
+                call_bindings = {
+                    slot.name: values[j] if j < len(values) else 0
+                    for j, slot in enumerate(first_sub.program.slots)
+                }
+            calls = [{"sub_id": first_sub.sub_id, "bindings": call_bindings}]
 
         plan = CompositionPlan(calls=calls)
         call_counts.append(len(calls))
         plans.append({**item, "plan_data": plan.to_dict(), "flat_program": prog.to_dict()})
 
-    # Log distribution
     if call_counts:
         logger.info(
             "Composition plan stats: mean=%.2f, median=%.1f, max=%d calls",
@@ -389,7 +481,10 @@ def build_composition_plans(programs: list, library: SubroutineLibrary) -> list:
             sorted(call_counts)[len(call_counts) // 2],
             max(call_counts),
         )
-    logger.info("Built %d composition plans", len(plans))
+    logger.info(
+        "Built %d composition plans (bindings: %d found, %d missed)",
+        len(plans), binding_found, binding_missed,
+    )
     return plans
 
 
