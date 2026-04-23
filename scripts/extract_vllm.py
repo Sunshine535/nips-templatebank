@@ -168,40 +168,65 @@ def answer_matches(result, answer):
         return str(result).strip().lower() == str(answer).strip().lower()
 
 
-def run_vllm_batch(prompts, model_path, tp, max_new_tokens, batch_tag=""):
-    from vllm import LLM, SamplingParams
+def run_batch_inference(prompts, model_path, tp, max_new_tokens, batch_tag=""):
+    """Batch inference using HF generate() with left-padding for throughput."""
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    logger.info("Initializing vLLM (tp=%d, model=%s)...", tp, model_path)
-    llm = LLM(
-        model=model_path,
-        tensor_parallel_size=tp,
-        dtype="bfloat16",
-        trust_remote_code=True,
-        max_model_len=4096,
-        gpu_memory_utilization=0.85,
+    logger.info("Loading model %s (device_map=auto)...", model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path, torch_dtype=torch.bfloat16,
+        device_map="auto", trust_remote_code=True,
     )
-    params = SamplingParams(
-        temperature=0,
-        max_tokens=max_new_tokens,
-    )
+    model.eval()
 
     texts = [p["text"] for p in prompts]
-    logger.info("Running vLLM batch inference on %d prompts %s...", len(texts), batch_tag)
+    batch_size = 8
+    responses = []
+    total_tokens = 0
     t0 = time.time()
-    outputs = llm.generate(texts, params)
+
+    for batch_start in range(0, len(texts), batch_size):
+        batch = texts[batch_start:batch_start + batch_size]
+        inputs = tokenizer(
+            batch, return_tensors="pt", padding=True,
+            truncation=True, max_length=2048,
+        ).to(model.device)
+
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs, max_new_tokens=max_new_tokens, do_sample=False,
+            )
+
+        for j, out in enumerate(outputs):
+            input_len = inputs["input_ids"][j].ne(tokenizer.pad_token_id).sum().item()
+            resp = tokenizer.decode(out[input_len:], skip_special_tokens=True)
+            responses.append(resp)
+            total_tokens += len(out) - input_len
+
+        done = min(batch_start + batch_size, len(texts))
+        elapsed = time.time() - t0
+        if done % 100 < batch_size or done == len(texts):
+            logger.info(
+                "  %s %d/%d (%.1f tok/s, %.1f prob/s, ETA %.0fm)",
+                batch_tag, done, len(texts),
+                total_tokens / max(elapsed, 1),
+                done / max(elapsed, 1),
+                (len(texts) - done) / max(done / elapsed, 0.01) / 60,
+            )
+
     elapsed = time.time() - t0
-    tokens_total = sum(len(o.outputs[0].token_ids) for o in outputs)
     logger.info(
-        "vLLM done in %.1fs (%.0f tok/s, %.1f problems/s)",
-        elapsed, tokens_total / elapsed, len(texts) / elapsed,
+        "Batch inference done in %.1fs (%.0f tok/s, %.1f problems/s)",
+        elapsed, total_tokens / max(elapsed, 1), len(texts) / max(elapsed, 1),
     )
 
-    responses = []
-    for o in outputs:
-        responses.append(o.outputs[0].text)
-
-    del llm
-    import torch
+    del model
     torch.cuda.empty_cache()
     import gc
     gc.collect()
@@ -291,7 +316,7 @@ def main():
     for batch_start in range(0, len(all_prompts), batch_size):
         batch = all_prompts[batch_start:batch_start + batch_size]
         tag = f"[{batch_start}:{batch_start + len(batch)}]"
-        responses = run_vllm_batch(batch, model_path, args.tp, args.max_new_tokens, tag)
+        responses = run_batch_inference(batch, model_path, args.tp, args.max_new_tokens, tag)
         results = process_responses(batch, responses, args.output_dir)
         all_results.extend(results)
 
