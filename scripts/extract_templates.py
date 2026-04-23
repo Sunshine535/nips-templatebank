@@ -153,17 +153,42 @@ def _answer_matches(exec_result, gold_answer: str, tol: float = 1e-3) -> bool:
         return str(exec_result).strip() == str(gold_answer).strip()
 
 
-def generate_programs(data: list, model, tokenizer, config: dict, source: str) -> list:
+def _flush_logs():
+    """Force flush all log handlers and stdout/stderr."""
+    for handler in logging.root.handlers:
+        handler.flush()
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+
+def generate_programs(data: list, model, tokenizer, config: dict, source: str,
+                      output_dir: str = None) -> list:
     """Generate K candidate programs per problem, keep shortest answer-correct one."""
-    max_new_tokens = config["teacher"]["max_new_tokens"]
-    k_samples = config["teacher"].get("samples_per_example", 4)
+    max_new_tokens = config["teacher"].get("max_new_tokens", 512)
+    k_samples = config["teacher"].get("samples_per_example", 1)
     temperature = config["teacher"].get("temperature", 0.7)
     top_p = config["teacher"].get("top_p", 0.95)
+    checkpoint_interval = config["teacher"].get("checkpoint_interval", 500)
     executor = Executor()
     results = []
     parse_ok, exec_ok, correct_ok, total = 0, 0, 0, 0
 
+    checkpoint_path = os.path.join(output_dir, f"_checkpoint_{source}.json") if output_dir else None
+    if checkpoint_path and os.path.exists(checkpoint_path):
+        with open(checkpoint_path) as f:
+            ckpt = json.load(f)
+        results = ckpt["results"]
+        start_idx = ckpt["next_idx"]
+        parse_ok, exec_ok, correct_ok = ckpt["parse_ok"], ckpt["exec_ok"], ckpt["correct_ok"]
+        total = start_idx
+        logger.info("  Resuming from checkpoint: idx=%d, correct=%d", start_idx, correct_ok)
+        _flush_logs()
+    else:
+        start_idx = 0
+
     for i, item in enumerate(data):
+        if i < start_idx:
+            continue
         total += 1
         prompt = EXTRACTION_PROMPT.format(
             problem=item["problem"][:500],
@@ -175,7 +200,6 @@ def generate_programs(data: list, model, tokenizer, config: dict, source: str) -
         text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
         inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=2048).to(model.device)
 
-        # Generate K candidates: first greedy, rest sampled
         candidates = []
         for k in range(k_samples):
             with torch.no_grad():
@@ -190,12 +214,13 @@ def generate_programs(data: list, model, tokenizer, config: dict, source: str) -
             program = _parse_program(response, f"{source}_p{i}_k{k}")
             if program is not None:
                 candidates.append(program)
+                if k == 0 and program is not None:
+                    break
 
         if not candidates:
             continue
         parse_ok += 1
 
-        # Execute all candidates and keep answer-correct ones
         correct_candidates = []
         any_exec = False
         for prog in candidates:
@@ -212,7 +237,6 @@ def generate_programs(data: list, model, tokenizer, config: dict, source: str) -
             continue
         correct_ok += 1
 
-        # Select shortest correct program
         best_prog, best_bindings, best_result = min(
             correct_candidates, key=lambda x: len(x[0].steps)
         )
@@ -226,16 +250,31 @@ def generate_programs(data: list, model, tokenizer, config: dict, source: str) -
             "exec_result": best_result,
         })
 
-        if (i + 1) % 100 == 0:
+        if (i + 1) % 50 == 0:
             logger.info(
-                "  [%s] %d/%d: parsed=%d, executable=%d, correct=%d",
+                "  [%s] %d/%d: parsed=%d, exec=%d, correct=%d (%.1f%%)",
                 source, i + 1, len(data), parse_ok, exec_ok, correct_ok,
+                100 * correct_ok / total if total > 0 else 0,
             )
+            _flush_logs()
+
+        if checkpoint_path and (i + 1) % checkpoint_interval == 0:
+            ckpt_data = {
+                "results": results, "next_idx": i + 1,
+                "parse_ok": parse_ok, "exec_ok": exec_ok, "correct_ok": correct_ok,
+            }
+            with open(checkpoint_path, "w") as f:
+                json.dump(ckpt_data, f)
+            logger.info("  Checkpoint saved: %d results at idx=%d", len(results), i + 1)
+            _flush_logs()
 
     logger.info(
         "[%s] Done: %d/%d parsed, %d/%d executable, %d/%d answer-correct",
         source, parse_ok, total, exec_ok, total, correct_ok, total,
     )
+    _flush_logs()
+    if checkpoint_path and os.path.exists(checkpoint_path):
+        os.remove(checkpoint_path)
     return results
 
 
@@ -738,7 +777,8 @@ def main():
 
         for source_name, items in source_data.items():
             logger.info("Processing %s (%d problems)...", source_name, len(items))
-            programs = generate_programs(items, model, tokenizer, config, source_name)
+            programs = generate_programs(items, model, tokenizer, config, source_name,
+                                          output_dir=args.output_dir)
             all_programs.extend(programs)
 
         del model

@@ -3,8 +3,9 @@ teacher:
   enable_thinking: false
   temperature: 0.2
   top_p: 0.95
-  max_new_tokens: 768
-  samples_per_example: 4
+  max_new_tokens: 512
+  samples_per_example: 1
+  checkpoint_interval: 500
   select: "shortest_valid_executable"
 
 planner:
