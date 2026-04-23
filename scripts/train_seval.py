@@ -275,7 +275,7 @@ def run_sft(model, tokenizer, dataset, output_dir, args):
         gradient_checkpointing=True,
         ddp_find_unused_parameters=False,
         report_to="none",
-        max_seq_length=1536,
+        max_length=1536,
     )
 
     trainer = SFTTrainer(
