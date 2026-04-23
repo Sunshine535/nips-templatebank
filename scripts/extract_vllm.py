@@ -53,13 +53,14 @@ Rules:
 
 
 def load_datasets(config):
-    from datasets import load_dataset
+    from datasets import concatenate_datasets, load_dataset
     all_data = {}
     for ds_key in ["gsm8k", "math"]:
         ds_cfg = config["datasets"][ds_key]
-        logger.info("Loading %s...", ds_key)
+        ds_id = ds_cfg.get("name", ds_cfg.get("dataset_id"))
+        logger.info("Loading %s (%s)...", ds_key, ds_id)
         if ds_key == "gsm8k":
-            ds = load_dataset(ds_cfg["name"], ds_cfg.get("subset", "main"), split="train")
+            ds = load_dataset(ds_id, ds_cfg.get("subset", "main"), split="train")
             items = []
             for row in ds:
                 answer = row.get("answer", "")
@@ -71,7 +72,14 @@ def load_datasets(config):
                     "answer": answer,
                 })
         else:
-            ds = load_dataset(ds_cfg["name"], split="train", trust_remote_code=True)
+            subsets = ds_cfg.get("subsets", [])
+            if subsets:
+                parts = []
+                for sub in subsets:
+                    parts.append(load_dataset(ds_id, sub, split="train", trust_remote_code=True))
+                ds = concatenate_datasets(parts)
+            else:
+                ds = load_dataset(ds_id, split="train", trust_remote_code=True)
             items = []
             for row in ds:
                 items.append({
@@ -79,6 +87,8 @@ def load_datasets(config):
                     "solution": row.get("solution", ""),
                     "answer": str(row.get("answer", "")),
                 })
+        max_train = ds_cfg.get("max_train", len(items))
+        items = items[:max_train]
         logger.info("  Loaded %d problems from %s", len(items), ds_key)
         all_data[ds_key] = items
     return all_data
