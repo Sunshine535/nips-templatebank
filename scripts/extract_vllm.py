@@ -73,13 +73,21 @@ def load_datasets(config):
                 })
         else:
             subsets = ds_cfg.get("subsets", [])
-            if subsets:
-                parts = []
-                for sub in subsets:
-                    parts.append(load_dataset(ds_id, sub, split="train", trust_remote_code=True))
-                ds = concatenate_datasets(parts)
-            else:
-                ds = load_dataset(ds_id, split="train", trust_remote_code=True)
+            try:
+                if subsets:
+                    parts = []
+                    for sub in subsets:
+                        parts.append(load_dataset(ds_id, sub, split="train"))
+                    ds = concatenate_datasets(parts)
+                else:
+                    ds = load_dataset(ds_id, split="train")
+            except Exception as e:
+                logger.error("Failed to load %s: %s. Trying without subsets...", ds_id, e)
+                try:
+                    ds = load_dataset(ds_id, split="train")
+                except Exception as e2:
+                    logger.error("Also failed: %s. Skipping %s.", e2, ds_key)
+                    continue
             items = []
             for row in ds:
                 items.append({
