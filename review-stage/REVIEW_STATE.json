@@ -1,23 +1,22 @@
 {
-  "round": 1,
+  "round": 2,
   "threadId": "019db66b-f612-7c01-86d8-56f4e043e209",
   "status": "in_progress",
   "difficulty": "nightmare",
   "last_score": 2.0,
   "last_verdict": "not ready",
-  "pending_experiments": ["phase0_extraction"],
   "strategy": "flat_program_grpo",
-  "timestamp": "2026-04-23T02:30:00Z",
-  "actions_taken": [
-    "Fixed 3 binding bugs in extraction pipeline",
-    "Rewrote train_seval.py with correct data schema and reward",
-    "Pivoted from composition to flat program GRPO",
-    "Phase 0 extraction running on pod"
-  ],
-  "next_steps": [
-    "Wait for Phase 0 extraction to complete",
-    "Run SFT on verified programs",
-    "Run GRPO with execution reward",
-    "Evaluate GRPO vs SFT (pass@1 and pass@K)"
-  ]
+  "timestamp": "2026-04-24T12:30:00Z",
+  "gsm8k_test_results": {
+    "base": {"accuracy": 0.0, "parse_rate": 0.0, "exec_rate": 0.0, "samples": 200, "status": "done"},
+    "sft": {"accuracy": 0.295, "parse_rate": 0.95, "exec_rate": 0.89, "correct": 59, "samples": 200, "status": "done"},
+    "grpo": {"accuracy": 0.30, "parse_rate": 0.96, "exec_rate": 0.92, "correct": 15, "samples": 50, "status": "running"}
+  },
+  "sft_train_results": {
+    "accuracy": 0.84, "parse_rate": 1.0, "exec_rate": 1.0, "samples": 50,
+    "train_loss": 0.060, "token_accuracy": 0.983, "train_time_sec": 330
+  },
+  "grpo_train_results": {
+    "steps": 500, "mean_reward_final": 0.80, "train_time_sec": 16040
+  }
 }
