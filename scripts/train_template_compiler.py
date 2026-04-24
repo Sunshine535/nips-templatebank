@@ -226,11 +226,42 @@ def main():
     parser.add_argument("--mode", type=str, default="compose", choices=["compose", "flat"])
     parser.add_argument("--training_data", type=str, default=None)
     parser.add_argument("--output_dir", type=str, default=None)
-    parser.add_argument("--resume", type=str, default="auto", help="auto / none / path")
+    parser.add_argument("--resume", type=str, default="none",
+                        help="none (default) / auto / <path>. Was 'auto' historically; "
+                             "default changed to 'none' for reproducibility.")
+    parser.add_argument("--resume_from", type=str, default=None,
+                        help="Explicit checkpoint path. Overrides --resume.")
+    parser.add_argument("--no_resume", action="store_true",
+                        help="Force fresh start; ignore any existing checkpoints.")
     parser.add_argument("--allow_synthetic", action="store_true", help="Allow synthetic fallback when real data unavailable")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--max_seq_length", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Global seed for Python/NumPy/Torch.")
     args = parser.parse_args()
+
+    import hashlib
+    import random
+
+    random.seed(args.seed)
+    try:
+        import numpy as np
+        np.random.seed(args.seed)
+    except ImportError:
+        pass
+    try:
+        import torch
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
+    except ImportError:
+        pass
+
+    if args.no_resume:
+        args.resume = "none"
+        args.resume_from = None
+    elif args.resume_from:
+        args.resume = args.resume_from
 
     with open(args.config) as f:
         config = yaml.safe_load(f)
@@ -248,6 +279,43 @@ def main():
     else:
         data_path = args.training_data or "results/templates/flat_train.json"
         output_dir = args.output_dir or "results/planner/flat"
+
+    def _hash_prefix(path):
+        if not path or not os.path.exists(path):
+            return None
+        try:
+            with open(path, "rb") as fp:
+                return hashlib.sha256(fp.read(1024 * 1024)).hexdigest()[:16]
+        except Exception:
+            return None
+
+    os.makedirs(output_dir, exist_ok=True)
+    manifest = {
+        "mode": args.mode,
+        "model_name": model_name,
+        "data_path": data_path,
+        "data_sha256_prefix": _hash_prefix(data_path),
+        "config_path": args.config,
+        "config_sha256_prefix": _hash_prefix(args.config),
+        "output_dir": output_dir,
+        "seed": args.seed,
+        "resume": args.resume,
+        "resume_from": args.resume_from,
+        "no_resume": args.no_resume,
+        "command": " ".join(sys.argv),
+        "python_version": sys.version.split()[0],
+    }
+    try:
+        import subprocess
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
+        ).decode().strip()
+        manifest["git_commit"] = commit[:10]
+    except Exception:
+        pass
+    with open(os.path.join(output_dir, "train_manifest.json"), "w") as f:
+        json.dump(manifest, f, indent=2)
+    logger.info("Training manifest saved: %s/train_manifest.json", output_dir)
 
     train(
         mode=args.mode,

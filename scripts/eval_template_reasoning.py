@@ -577,7 +577,42 @@ def main():
     parser.add_argument("--binding_subset", type=int, default=200,
                         help="Number of examples for binding analysis")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--require_adapters", action="store_true",
+                        help="Fail loudly if adapter/LoRA checkpoint is missing.")
+    parser.add_argument("--allow_base_model", action="store_true",
+                        help="Explicitly allow evaluating base model (adapter-less).")
+    parser.add_argument("--no_fallback", action="store_true",
+                        help="Disable CoT fallback; report method_accuracy only.")
+    parser.add_argument("--primary_metric", choices=["method_accuracy", "combined_accuracy"],
+                        default="method_accuracy",
+                        help="Which accuracy to report as primary. Default: method_accuracy.")
     args = parser.parse_args()
+
+    import hashlib
+
+    def _compute_hash(path):
+        if not path or not os.path.exists(path):
+            return None
+        try:
+            with open(path, "rb") as fp:
+                return hashlib.sha256(fp.read(1024 * 1024)).hexdigest()[:16]
+        except Exception:
+            return None
+
+    for dir_key, dir_path in [("compose_dir", args.compose_dir),
+                               ("flat_dir", args.flat_dir)]:
+        adapter_cfg = os.path.join(dir_path, "adapter_config.json") if dir_path else None
+        adapter_exists = adapter_cfg and os.path.exists(adapter_cfg)
+        if args.require_adapters and not adapter_exists and not args.allow_base_model:
+            logger.error(
+                "REQUIRE_ADAPTERS: adapter_config.json not found at %s. "
+                "Pass --allow_base_model to evaluate base model anyway.",
+                adapter_cfg,
+            )
+            sys.exit(2)
+
+    if args.require_adapters:
+        logger.info("Adapter check OK (or --allow_base_model active).")
 
     with open(args.config) as f:
         config = yaml.safe_load(f)
@@ -598,7 +633,26 @@ def main():
         "seed": args.seed,
         "has_library": library is not None,
         "library_size": library.size if library else 0,
+        "library_sha256_prefix": _compute_hash(args.library_path),
+        "programs_sha256_prefix": _compute_hash(args.programs_path),
+        "split_sha256_prefix": _compute_hash(args.split_path) if args.split_path else None,
+        "compose_adapter_path": args.compose_dir,
+        "flat_adapter_path": args.flat_dir,
+        "require_adapters": args.require_adapters,
+        "allow_base_model": args.allow_base_model,
+        "no_fallback": args.no_fallback,
+        "primary_metric": args.primary_metric,
+        "command": " ".join(sys.argv),
+        "python_version": sys.version.split()[0],
     }}
+    try:
+        import subprocess
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
+        ).decode().strip()
+        all_results["meta"]["git_commit"] = commit[:10]
+    except Exception:
+        pass
 
     mcd_test_data = None
     if args.split_path and os.path.exists(args.split_path):
