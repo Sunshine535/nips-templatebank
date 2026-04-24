@@ -1,0 +1,11 @@
+{
+  "data_file": "results/gift_step/compose_train_gift.json",
+  "n_plans_executed": 565,
+  "total_bindings_tested": 2264,
+  "total_active": 2204,
+  "total_dead": 60,
+  "active_binding_rate": 0.9734982332155477,
+  "plans_all_active": 529,
+  "plans_with_any_dead": 36,
+  "plans_all_active_rate": 0.9362831858407079
+}

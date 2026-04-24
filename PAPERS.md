@@ -1,5 +1,9 @@
 # Papers: Template Algebra
 
+**⚠️ WARNING: Many arXiv IDs in this file are placeholders (e.g., `2501.XXXXX`)
+and must NOT be used as real citations. They need to be replaced with verified
+real papers before any paper submission. See `reports/REMAINING_RISKS.md`.**
+
 Core references for the formal algebraic operations on reasoning templates project,
 organized by relevance category.
 

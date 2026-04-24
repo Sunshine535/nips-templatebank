@@ -1,6 +1,13 @@
 # Verified Procedural Abstractions for Compositional Math Reasoning
 
-Compression-mined, execution-verified subroutine libraries that transfer across model sizes and predict compositional generalization via MDL compression ratio.
+**STATUS: DEVELOPMENT / NEGATIVE RESULTS**
+
+Execution-verified subroutine libraries for compositional math reasoning.
+Currently investigating: typed DSL program generation via SFT/GRPO, and
+GIFT (Grounded Interface-Flow Template Composition) as an extension.
+
+See `reports/STOP_GATE_CURRENT.md` for current blockers and
+`reports/NEXT_GPT55_REVIEW_PACKAGE.md` for current evidence.
 
 ## Setup
 
@@ -200,8 +207,22 @@ refine-logs/
 | Student A | Qwen/Qwen3.5-9B | Compose/flat planner (LoRA r=32, α=64) |
 | Student B | Qwen/Qwen3.5-4B | Portability test |
 
-## Claims
+## Current Evidence (NOT CLAIMS)
 
-1. **Portable Verified Library**: frozen 32B-mined library → 9B beats CoT-distilled by ≥15pts on MCD-hard
-2. **Compression Diagnostic**: MDL ratio outpredicts library size, trace length, teacher accuracy
-3. **Search-Time Repair**: typed MCTS repair recovers ≥25% failed plans under matched budget
+All numbers below are from seed 42 only and must not be cited as final results.
+
+- SFT on 697 verified GSM8K programs teaches typed program generation: 0% → 29.5% on GSM8K test (200 samples)
+- GRPO with execution-verified reward shows no improvement over SFT (both 29.5%)
+- GIFT DataflowPlan format is learnable (99.5% parse rate) but current library produces only 20.2% faithful coverage and 0 true-dataflow plans
+- See `results/seval/gsm8k_test/results.json` and `results/gift/gsm8k_test/results.json`
+
+## Unsupported Hypotheses (NOT CLAIMS — future work)
+
+The following were earlier aspirational targets. They are NOT currently supported:
+
+- Frozen library beats CoT-distilled by ≥15pts on MCD-hard — unsupported
+- MDL ratio outpredicts other diagnostics — unsupported
+- MCTS repair recovers ≥25% failed plans — unsupported
+- RLVR library evolution improves MATH — unsupported
+
+See `reports/CLAIM_UPDATE_LOG.md` and `reports/REMAINING_RISKS.md`.

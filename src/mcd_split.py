@@ -259,6 +259,7 @@ def build_mcd_split(
     min_unseen_compounds: float = 0.40,
     num_trials: int = 500,
     seed: int = 42,
+    compound_mode: str = "legacy",
 ) -> Dict[str, List[int]]:
     """Build an MCD split that maximizes compound divergence.
 
@@ -269,6 +270,8 @@ def build_mcd_split(
         min_unseen_compounds: Minimum fraction of unseen compounds in test.
         num_trials: Number of random trials.
         seed: Random seed.
+        compound_mode: "legacy" (adjacency-based, old behavior) or
+            "true_dataflow" (only explicit call_output edges from GIFT plans).
 
     Returns:
         Dict with "train", "dev", "test" keys mapping to lists of indices.
@@ -278,8 +281,15 @@ def build_mcd_split(
     n_train = int(n * train_ratio)
     n_dev = int(n * dev_ratio)
 
+    if compound_mode == "true_dataflow":
+        compound_fn = extract_compounds_true_dataflow
+    elif compound_mode == "legacy":
+        compound_fn = extract_compounds
+    else:
+        raise ValueError(f"Unknown compound_mode: {compound_mode}")
+
     all_atoms = [extract_atoms(ex.get("plan_data", ex)) for ex in examples]
-    all_compounds = [extract_compounds(ex.get("plan_data", ex)) for ex in examples]
+    all_compounds = [compound_fn(ex.get("plan_data", ex)) for ex in examples]
 
     best_split = None
     best_score = -1.0

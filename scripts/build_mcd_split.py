@@ -116,6 +116,12 @@ def main():
     parser.add_argument("--min_unseen_compounds", type=float, default=None)
     parser.add_argument("--num_trials", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--compound_mode",
+        choices=["legacy", "true_dataflow"],
+        default="legacy",
+        help="legacy: adjacency-based compounds. true_dataflow: only explicit call_output edges.",
+    )
     args = parser.parse_args()
 
     mcd_cfg = {}
@@ -182,6 +188,7 @@ def main():
         min_unseen_compounds=min_unseen,
         num_trials=num_trials,
         seed=args.seed,
+        compound_mode=args.compound_mode,
     )
 
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)

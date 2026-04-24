@@ -1,0 +1,1340 @@
+{
+  "P000": {
+    "sub_id": "P000",
+    "program": {
+      "program_id": "primitive_P000",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a * b",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 663,
+    "mdl_gain": 663
+  },
+  "P001": {
+    "sub_id": "P001",
+    "program": {
+      "program_id": "primitive_P001",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + b",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 417,
+    "mdl_gain": 417
+  },
+  "P002": {
+    "sub_id": "P002",
+    "program": {
+      "program_id": "primitive_P002",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a - b",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 403,
+    "mdl_gain": 403
+  },
+  "P003": {
+    "sub_id": "P003",
+    "program": {
+      "program_id": "primitive_P003",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a / b",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 210,
+    "mdl_gain": 210
+  },
+  "P004": {
+    "sub_id": "P004",
+    "program": {
+      "program_id": "primitive_P004",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 145,
+    "mdl_gain": 145
+  },
+  "P005": {
+    "sub_id": "P005",
+    "program": {
+      "program_id": "primitive_P005",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + b + c",
+          "inputs": [
+            "a",
+            "b",
+            "c"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 83,
+    "mdl_gain": 83
+  },
+  "P006": {
+    "sub_id": "P006",
+    "program": {
+      "program_id": "primitive_P006",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a / 2",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 45,
+    "mdl_gain": 45
+  },
+  "P007": {
+    "sub_id": "P007",
+    "program": {
+      "program_id": "primitive_P007",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a * b / 100",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 45,
+    "mdl_gain": 45
+  },
+  "P008": {
+    "sub_id": "P008",
+    "program": {
+      "program_id": "primitive_P008",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "round(a)",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 36,
+    "mdl_gain": 36
+  },
+  "P009": {
+    "sub_id": "P009",
+    "program": {
+      "program_id": "primitive_P009",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a * 2",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 21,
+    "mdl_gain": 21
+  },
+  "P010": {
+    "sub_id": "P010",
+    "program": {
+      "program_id": "primitive_P010",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        },
+        {
+          "name": "d",
+          "dtype": "float",
+          "description": "input d"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + b + c + d",
+          "inputs": [
+            "a",
+            "b",
+            "c",
+            "d"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 19,
+    "mdl_gain": 19
+  },
+  "P011": {
+    "sub_id": "P011",
+    "program": {
+      "program_id": "primitive_P011",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a * (b / 100)",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 11,
+    "mdl_gain": 11
+  },
+  "P012": {
+    "sub_id": "P012",
+    "program": {
+      "program_id": "primitive_P012",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a / 2.0",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 11,
+    "mdl_gain": 11
+  },
+  "P013": {
+    "sub_id": "P013",
+    "program": {
+      "program_id": "primitive_P013",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a - b - c",
+          "inputs": [
+            "a",
+            "b",
+            "c"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 10,
+    "mdl_gain": 10
+  },
+  "P014": {
+    "sub_id": "P014",
+    "program": {
+      "program_id": "primitive_P014",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + b - c",
+          "inputs": [
+            "a",
+            "b",
+            "c"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 7,
+    "mdl_gain": 7
+  },
+  "P015": {
+    "sub_id": "P015",
+    "program": {
+      "program_id": "primitive_P015",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a * (b / c)",
+          "inputs": [
+            "a",
+            "b",
+            "c"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 5,
+    "mdl_gain": 5
+  },
+  "P016": {
+    "sub_id": "P016",
+    "program": {
+      "program_id": "primitive_P016",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a * 2.0",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 5,
+    "mdl_gain": 5
+  },
+  "P017": {
+    "sub_id": "P017",
+    "program": {
+      "program_id": "primitive_P017",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + 0",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 5,
+    "mdl_gain": 5
+  },
+  "P018": {
+    "sub_id": "P018",
+    "program": {
+      "program_id": "primitive_P018",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a * b * c",
+          "inputs": [
+            "a",
+            "b",
+            "c"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 4,
+    "mdl_gain": 4
+  },
+  "P019": {
+    "sub_id": "P019",
+    "program": {
+      "program_id": "primitive_P019",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        },
+        {
+          "name": "d",
+          "dtype": "float",
+          "description": "input d"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a - (b + c + d)",
+          "inputs": [
+            "a",
+            "b",
+            "c",
+            "d"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 4,
+    "mdl_gain": 4
+  },
+  "P020": {
+    "sub_id": "P020",
+    "program": {
+      "program_id": "primitive_P020",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "100 - a",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 4,
+    "mdl_gain": 4
+  },
+  "P021": {
+    "sub_id": "P021",
+    "program": {
+      "program_id": "primitive_P021",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + a / 2",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 4,
+    "mdl_gain": 4
+  },
+  "P022": {
+    "sub_id": "P022",
+    "program": {
+      "program_id": "primitive_P022",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a / 3",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  },
+  "P023": {
+    "sub_id": "P023",
+    "program": {
+      "program_id": "primitive_P023",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        },
+        {
+          "name": "d",
+          "dtype": "float",
+          "description": "input d"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a - b - c - d",
+          "inputs": [
+            "a",
+            "b",
+            "c",
+            "d"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  },
+  "P024": {
+    "sub_id": "P024",
+    "program": {
+      "program_id": "primitive_P024",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        },
+        {
+          "name": "d",
+          "dtype": "float",
+          "description": "input d"
+        },
+        {
+          "name": "e",
+          "dtype": "float",
+          "description": "input e"
+        },
+        {
+          "name": "f",
+          "dtype": "float",
+          "description": "input f"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + b + c + d + e + f",
+          "inputs": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  },
+  "P025": {
+    "sub_id": "P025",
+    "program": {
+      "program_id": "primitive_P025",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "(a - b) / 2",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  },
+  "P026": {
+    "sub_id": "P026",
+    "program": {
+      "program_id": "primitive_P026",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "(a - b) / c",
+          "inputs": [
+            "a",
+            "b",
+            "c"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  },
+  "P027": {
+    "sub_id": "P027",
+    "program": {
+      "program_id": "primitive_P027",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "100.0 - a",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  },
+  "P028": {
+    "sub_id": "P028",
+    "program": {
+      "program_id": "primitive_P028",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        },
+        {
+          "name": "b",
+          "dtype": "float",
+          "description": "input b"
+        },
+        {
+          "name": "c",
+          "dtype": "float",
+          "description": "input c"
+        },
+        {
+          "name": "d",
+          "dtype": "float",
+          "description": "input d"
+        },
+        {
+          "name": "e",
+          "dtype": "float",
+          "description": "input e"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + b + c + d + e",
+          "inputs": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  },
+  "P029": {
+    "sub_id": "P029",
+    "program": {
+      "program_id": "primitive_P029",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a + 1",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  },
+  "P030": {
+    "sub_id": "P030",
+    "program": {
+      "program_id": "primitive_P030",
+      "slots": [
+        {
+          "name": "a",
+          "dtype": "float",
+          "description": "input a"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "result",
+          "expr": "a * 1.0",
+          "inputs": [
+            "a"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "result",
+          "inputs": [
+            "result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 3,
+    "mdl_gain": 3
+  }
+}

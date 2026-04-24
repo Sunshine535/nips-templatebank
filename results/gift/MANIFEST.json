@@ -1,0 +1,34 @@
+{
+  "gift_version": "v1",
+  "generated_at": "2026-04-24",
+  "builder": "scripts/build_gift_data.py",
+  "builder_commit": "2fe1a93",
+  "source_programs": "results/templates_verified/all_programs.json (697 programs)",
+  "source_library": "results/templates_verified/subroutine_library.json (16 subs)",
+  "command": "python3 scripts/build_gift_data.py --programs results/templates_verified/all_programs.json --library results/templates_verified/subroutine_library.json --output_dir results/gift",
+  "audit": {
+    "total": 697,
+    "faithful_coverage": 0.202,
+    "single_call": 141,
+    "two_call_true_dataflow": 0,
+    "active_binding_tested": 0
+  },
+  "artifacts": {
+    "compose_train_gift.json": {
+      "size_bytes": 189801,
+      "sha256": "77a2989afe129de9e29be0d8c6fa4aaa8f3e284630ff858fc0850a8fe4d0d1b6"
+    },
+    "flat_train_faithful.json": {
+      "size_bytes": 1118203,
+      "sha256": "29a16cf0322d1471aaec7f4d8d9b4b3319e5b726626b7aed34349cdb806c9bc7"
+    },
+    "library_gift.json": {
+      "size_bytes": 28463,
+      "sha256": "e567a7d4399e42f94f6f58de70697790f65ca764c93f1bbb760aa280bb1cfd98"
+    },
+    "plan_audit.json": {
+      "size_bytes": 278,
+      "sha256": "86d6a7098fc90e666b4cf6224dbeac8e7357da30c7b714bb142bbc8b1c406fcd"
+    }
+  }
+}

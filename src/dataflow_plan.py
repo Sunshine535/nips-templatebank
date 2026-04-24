@@ -19,19 +19,39 @@ from src.template_dsl import DType, Executor, SubroutineLibrary
 class BindingRef:
     """Explicit reference for a subroutine slot binding.
 
-    source="quantity": value is a number from the problem text
+    source="quantity": grounded quantity from problem text
+        - qid: stable quantity ID (e.g., "q3") — preferred
+        - value: numeric value (must match qid if both present)
+        - span: original text span (e.g., "12 boxes")
+        - entity: optional entity label
+        - role: optional semantic role
     source="call_output": value comes from a previous call's output
+        - call_id: source call's call_id
     source="constant": a literal constant (e.g., 0, 1, pi)
+        - value: the constant
     """
     source: Literal["quantity", "call_output", "constant"]
     value: Optional[Any] = None
     call_id: Optional[str] = None
     dtype: Optional[str] = None
+    qid: Optional[str] = None
+    span: Optional[str] = None
+    entity: Optional[str] = None
+    role: Optional[str] = None
 
     def to_dict(self) -> dict:
         d = {"source": self.source}
         if self.source == "quantity":
-            d["value"] = self.value
+            if self.qid is not None:
+                d["qid"] = self.qid
+            if self.value is not None:
+                d["value"] = self.value
+            if self.span is not None:
+                d["span"] = self.span
+            if self.entity is not None:
+                d["entity"] = self.entity
+            if self.role is not None:
+                d["role"] = self.role
         elif self.source == "call_output":
             d["call_id"] = self.call_id
         elif self.source == "constant":
@@ -47,6 +67,10 @@ class BindingRef:
             value=data.get("value"),
             call_id=data.get("call_id"),
             dtype=data.get("dtype"),
+            qid=data.get("qid"),
+            span=data.get("span"),
+            entity=data.get("entity"),
+            role=data.get("role"),
         )
 
 
@@ -195,9 +219,69 @@ class DataflowExecutor:
 
         return True, final_result, stats
 
+    def execute_with_quantities(self, plan: DataflowPlan, quantities: dict) -> tuple:
+        """Execute using quantity lookup by qid (preferred over raw value).
+
+        quantities: {qid: value} mapping from the problem.
+        """
+        stats = {
+            "calls_made": 0, "calls_succeeded": 0, "calls_failed": 0,
+            "bindings_resolved": 0, "bindings_missing": 0,
+        }
+        call_outputs = {}
+        for call in plan.calls:
+            sub = self.library.get(call.sub_id)
+            if sub is None:
+                stats["calls_failed"] += 1
+                return False, None, {**stats, "error": f"Unknown sub '{call.sub_id}'"}
+            required_slots = {slot.name for slot in sub.program.slots}
+            missing = required_slots - set(call.bindings.keys())
+            if missing:
+                stats["calls_failed"] += 1
+                stats["bindings_missing"] += len(missing)
+                return False, None, {**stats, "error": f"Missing bindings: {sorted(missing)}"}
+            call_bindings = {}
+            for slot_name, ref in call.bindings.items():
+                if slot_name not in required_slots:
+                    continue
+                val = self._resolve_ref_with_qid(ref, call_outputs, quantities)
+                if val is None:
+                    stats["calls_failed"] += 1
+                    return False, None, {**stats, "error": f"Cannot resolve {slot_name}"}
+                call_bindings[slot_name] = val
+                stats["bindings_resolved"] += 1
+            stats["calls_made"] += 1
+            success, result, _ = self.executor.execute(sub.program, call_bindings)
+            if not success or result is None:
+                stats["calls_failed"] += 1
+                return False, None, {**stats, "error": f"Exec failed in {call.sub_id}"}
+            call_outputs[call.call_id] = result
+            stats["calls_succeeded"] += 1
+        if plan.final is not None:
+            final = self._resolve_ref_with_qid(plan.final, call_outputs, quantities)
+        elif call_outputs:
+            final = list(call_outputs.values())[-1]
+        else:
+            final = None
+        return True, final, stats
+
     def _resolve_ref(self, ref: BindingRef, call_outputs: dict) -> Any:
-        """Resolve a BindingRef to a concrete value."""
+        """Resolve a BindingRef to a concrete value (no quantity lookup)."""
         if ref.source == "quantity":
+            return ref.value
+        elif ref.source == "constant":
+            return ref.value
+        elif ref.source == "call_output":
+            if ref.call_id is None or ref.call_id not in call_outputs:
+                return None
+            return call_outputs[ref.call_id]
+        return None
+
+    def _resolve_ref_with_qid(self, ref: BindingRef, call_outputs: dict, quantities: dict) -> Any:
+        """Resolve a BindingRef, preferring qid lookup for quantities."""
+        if ref.source == "quantity":
+            if ref.qid is not None and ref.qid in quantities:
+                return quantities[ref.qid]
             return ref.value
         elif ref.source == "constant":
             return ref.value

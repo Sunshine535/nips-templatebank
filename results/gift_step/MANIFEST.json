@@ -1,0 +1,14 @@
+{
+  "gift_version": "step_primitive_v1",
+  "builder": "scripts/build_gift_step_primitives.py",
+  "source_programs": "results/templates_verified/all_programs.json",
+  "min_support": 3,
+  "coverage": 0.8106169296987088,
+  "true_dataflow_rate": 1.0300884955752212,
+  "compose_train_gift.json_sha256": "6eae095693d39e91fac5d569ea3ad478df463252aab4249c1a8efb4fe79cb55f",
+  "compose_train_gift.json_size": 1095089,
+  "library_gift.json_sha256": "9b74660169d45aed14aad697a347e4de1e760e71e964e011d529c6b13fcd96b4",
+  "library_gift.json_size": 26507,
+  "plan_audit.json_sha256": "038d90d5876919551f9d0d684d3a15b6505d43dc034b6be2c79a1f1a6b0a3a87",
+  "plan_audit.json_size": 355
+}

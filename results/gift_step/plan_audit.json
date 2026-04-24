@@ -1,0 +1,19 @@
+{
+  "total": 697,
+  "plan_built": 586,
+  "plan_executed": 586,
+  "plan_correct": 565,
+  "two_call_true_dataflow": 52,
+  "multi_call_true_dataflow": 582,
+  "call_counts": {
+    "3": 388,
+    "5": 27,
+    "4": 108,
+    "2": 52,
+    "6": 10,
+    "7": 1
+  },
+  "library_size": 31,
+  "coverage": 0.8106169296987088,
+  "true_dataflow_rate": 1.0300884955752212
+}

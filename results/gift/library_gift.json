@@ -1,0 +1,1180 @@
+{
+  "L00": {
+    "sub_id": "L00",
+    "program": {
+      "program_id": "gsm8k_p245",
+      "slots": [
+        {
+          "name": "crate_count",
+          "dtype": "float",
+          "description": "number of crates"
+        },
+        {
+          "name": "oranges_per_crate",
+          "dtype": "float",
+          "description": "oranges in each crate"
+        },
+        {
+          "name": "box_count",
+          "dtype": "float",
+          "description": "number of boxes"
+        },
+        {
+          "name": "nectarines_per_box",
+          "dtype": "float",
+          "description": "nectarines in each box"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "total_oranges",
+          "expr": "crate_count * oranges_per_crate",
+          "inputs": [
+            "crate_count",
+            "oranges_per_crate"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_nectarines",
+          "expr": "box_count * nectarines_per_box",
+          "inputs": [
+            "box_count",
+            "nectarines_per_box"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_fruit",
+          "expr": "total_oranges + total_nectarines",
+          "inputs": [
+            "total_oranges",
+            "total_nectarines"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "total_fruit",
+          "inputs": [
+            "total_fruit"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 18,
+    "mdl_gain": 72
+  },
+  "L01": {
+    "sub_id": "L01",
+    "program": {
+      "program_id": "gsm8k_p491",
+      "slots": [
+        {
+          "name": "blocks_to_store",
+          "dtype": "float",
+          "description": "blocks from home to store"
+        },
+        {
+          "name": "blocks_to_gallery",
+          "dtype": "float",
+          "description": "blocks from store to gallery"
+        },
+        {
+          "name": "blocks_to_work",
+          "dtype": "float",
+          "description": "blocks from gallery to work"
+        },
+        {
+          "name": "blocks_already_walked",
+          "dtype": "float",
+          "description": "blocks Jess has already walked"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "total_distance",
+          "expr": "blocks_to_store + blocks_to_gallery + blocks_to_work",
+          "inputs": [
+            "blocks_to_store",
+            "blocks_to_gallery",
+            "blocks_to_work"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "remaining_distance",
+          "expr": "total_distance - blocks_already_walked",
+          "inputs": [
+            "total_distance",
+            "blocks_already_walked"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "final_result",
+          "expr": "remaining_distance",
+          "inputs": [
+            "remaining_distance"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "final_result",
+          "inputs": [
+            "final_result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 18,
+    "mdl_gain": 72
+  },
+  "L02": {
+    "sub_id": "L02",
+    "program": {
+      "program_id": "gsm8k_p560",
+      "slots": [
+        {
+          "name": "num_boxes",
+          "dtype": "float",
+          "description": "number of boxes of erasers"
+        },
+        {
+          "name": "erasers_per_box",
+          "dtype": "float",
+          "description": "number of erasers in each box"
+        },
+        {
+          "name": "price_per_eraser",
+          "dtype": "float",
+          "description": "selling price per eraser"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "total_erasers",
+          "expr": "num_boxes * erasers_per_box",
+          "inputs": [
+            "num_boxes",
+            "erasers_per_box"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "revenue",
+          "expr": "total_erasers * price_per_eraser",
+          "inputs": [
+            "total_erasers",
+            "price_per_eraser"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "final_amount",
+          "expr": "revenue",
+          "inputs": [
+            "revenue"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "final_amount",
+          "inputs": [
+            "final_amount"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 12,
+    "mdl_gain": 48
+  },
+  "L03": {
+    "sub_id": "L03",
+    "program": {
+      "program_id": "gsm8k_p188",
+      "slots": [
+        {
+          "name": "david_glasses",
+          "dtype": "float",
+          "description": "number of glasses David broke"
+        },
+        {
+          "name": "multiplier",
+          "dtype": "float",
+          "description": "factor by which William's glasses exceed David's"
+        },
+        {
+          "name": "william_glasses",
+          "dtype": "float",
+          "description": "number of glasses William broke"
+        },
+        {
+          "name": "total_glasses",
+          "dtype": "float",
+          "description": "total number of glasses broken by both"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "william_glasses",
+          "expr": "david_glasses * multiplier",
+          "inputs": [
+            "david_glasses",
+            "multiplier"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_glasses",
+          "expr": "david_glasses + william_glasses",
+          "inputs": [
+            "david_glasses",
+            "william_glasses"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "intermediate_check",
+          "expr": "total_glasses - david_glasses",
+          "inputs": [
+            "total_glasses",
+            "david_glasses"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "total_glasses",
+          "inputs": [
+            "total_glasses"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 9,
+    "mdl_gain": 36
+  },
+  "L04": {
+    "sub_id": "L04",
+    "program": {
+      "program_id": "gsm8k_p53",
+      "slots": [
+        {
+          "name": "ice_cream_cartons",
+          "dtype": "float",
+          "description": "number of ice cream cartons"
+        },
+        {
+          "name": "ice_cream_cost",
+          "dtype": "float",
+          "description": "cost per ice cream carton"
+        },
+        {
+          "name": "yoghurt_cartons",
+          "dtype": "float",
+          "description": "number of frozen yoghurt cartons"
+        },
+        {
+          "name": "yoghurt_cost",
+          "dtype": "float",
+          "description": "cost per frozen yoghurt carton"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "total_ice_cream_cost",
+          "expr": "ice_cream_cartons * ice_cream_cost",
+          "inputs": [
+            "ice_cream_cartons",
+            "ice_cream_cost"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_yoghurt_cost",
+          "expr": "yoghurt_cartons * yoghurt_cost",
+          "inputs": [
+            "yoghurt_cartons",
+            "yoghurt_cost"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "difference",
+          "expr": "total_ice_cream_cost - total_yoghurt_cost",
+          "inputs": [
+            "total_ice_cream_cost",
+            "total_yoghurt_cost"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "difference",
+          "inputs": [
+            "difference"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 8,
+    "mdl_gain": 32
+  },
+  "L05": {
+    "sub_id": "L05",
+    "program": {
+      "program_id": "gsm8k_p763",
+      "slots": [
+        {
+          "name": "total_ribbon",
+          "dtype": "float",
+          "description": "Total yards of ribbon Josh has"
+        },
+        {
+          "name": "num_gifts",
+          "dtype": "float",
+          "description": "Number of gifts to receive ribbon"
+        },
+        {
+          "name": "ribbon_per_gift",
+          "dtype": "float",
+          "description": "Yards of ribbon used per gift"
+        },
+        {
+          "name": "initial_total",
+          "dtype": "float",
+          "description": "Total ribbon used for all gifts"
+        },
+        {
+          "name": "remaining_ribbon",
+          "dtype": "float",
+          "description": "Yards of ribbon left over"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "initial_total",
+          "expr": "num_gifts * ribbon_per_gift",
+          "inputs": [
+            "num_gifts",
+            "ribbon_per_gift"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "remaining_ribbon",
+          "expr": "total_ribbon - initial_total",
+          "inputs": [
+            "total_ribbon",
+            "initial_total"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "final_result",
+          "expr": "remaining_ribbon",
+          "inputs": [
+            "remaining_ribbon"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "final_result",
+          "inputs": [
+            "final_result"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 8,
+    "mdl_gain": 32
+  },
+  "L06": {
+    "sub_id": "L06",
+    "program": {
+      "program_id": "gsm8k_p222",
+      "slots": [
+        {
+          "name": "total_pages",
+          "dtype": "float",
+          "description": "Total pages Bekah needs to read"
+        },
+        {
+          "name": "pages_read",
+          "dtype": "float",
+          "description": "Pages already read over the weekend"
+        },
+        {
+          "name": "days_left",
+          "dtype": "float",
+          "description": "Number of days remaining to finish"
+        },
+        {
+          "name": "pages_per_day",
+          "dtype": "float",
+          "description": "Pages to read each day"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "pages_remaining",
+          "expr": "total_pages - pages_read",
+          "inputs": [
+            "total_pages",
+            "pages_read"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "pages_per_day",
+          "expr": "pages_remaining / days_left",
+          "inputs": [
+            "pages_remaining",
+            "days_left"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "verification",
+          "expr": "pages_per_day * days_left",
+          "inputs": [
+            "pages_per_day",
+            "days_left"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "pages_per_day",
+          "inputs": [
+            "pages_per_day"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 7,
+    "mdl_gain": 28
+  },
+  "L07": {
+    "sub_id": "L07",
+    "program": {
+      "program_id": "gsm8k_p147",
+      "slots": [
+        {
+          "name": "green_start",
+          "dtype": "float",
+          "description": "initial green crayons"
+        },
+        {
+          "name": "blue_start",
+          "dtype": "float",
+          "description": "initial blue crayons"
+        },
+        {
+          "name": "green_given",
+          "dtype": "float",
+          "description": "green crayons given away"
+        },
+        {
+          "name": "blue_given",
+          "dtype": "float",
+          "description": "blue crayons given away"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "total_start",
+          "expr": "green_start + blue_start",
+          "inputs": [
+            "green_start",
+            "blue_start"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_given",
+          "expr": "green_given + blue_given",
+          "inputs": [
+            "green_given",
+            "blue_given"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "remaining",
+          "expr": "total_start - total_given",
+          "inputs": [
+            "total_start",
+            "total_given"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "remaining",
+          "inputs": [
+            "remaining"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 6,
+    "mdl_gain": 24
+  },
+  "L08": {
+    "sub_id": "L08",
+    "program": {
+      "program_id": "gsm8k_p195",
+      "slots": [
+        {
+          "name": "num_drinks",
+          "dtype": "float",
+          "description": "number of drink boxes"
+        },
+        {
+          "name": "price_drink",
+          "dtype": "float",
+          "description": "price per drink box"
+        },
+        {
+          "name": "num_pizzas",
+          "dtype": "float",
+          "description": "number of pizza boxes"
+        },
+        {
+          "name": "price_pizza",
+          "dtype": "float",
+          "description": "price per pizza box"
+        },
+        {
+          "name": "total_paid",
+          "dtype": "float",
+          "description": "total amount paid"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "cost_drinks",
+          "expr": "num_drinks * price_drink",
+          "inputs": [
+            "num_drinks",
+            "price_drink"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "cost_pizzas",
+          "expr": "num_pizzas * price_pizza",
+          "inputs": [
+            "num_pizzas",
+            "price_pizza"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_cost",
+          "expr": "cost_drinks + cost_pizzas",
+          "inputs": [
+            "cost_drinks",
+            "cost_pizzas"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "change",
+          "expr": "total_paid - total_cost",
+          "inputs": [
+            "total_paid",
+            "total_cost"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "change",
+          "inputs": [
+            "change"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 6,
+    "mdl_gain": 30
+  },
+  "L09": {
+    "sub_id": "L09",
+    "program": {
+      "program_id": "gsm8k_p364",
+      "slots": [
+        {
+          "name": "stu_books",
+          "dtype": "float",
+          "description": "number of books Stu has"
+        },
+        {
+          "name": "multiplier",
+          "dtype": "float",
+          "description": "factor by which Albert has more books"
+        },
+        {
+          "name": "albert_books",
+          "dtype": "float",
+          "description": "number of books Albert has"
+        },
+        {
+          "name": "total_books",
+          "dtype": "float",
+          "description": "combined total of books"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "albert_books",
+          "expr": "stu_books * multiplier",
+          "inputs": [
+            "stu_books",
+            "multiplier"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_books",
+          "expr": "albert_books + stu_books",
+          "inputs": [
+            "albert_books",
+            "stu_books"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "final",
+          "expr": "total_books",
+          "inputs": [
+            "total_books"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "final",
+          "inputs": [
+            "final"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 6,
+    "mdl_gain": 24
+  },
+  "L10": {
+    "sub_id": "L10",
+    "program": {
+      "program_id": "gsm8k_p779",
+      "slots": [
+        {
+          "name": "flower_cost",
+          "dtype": "float",
+          "description": "cost of the flowers"
+        },
+        {
+          "name": "pot_extra",
+          "dtype": "float",
+          "description": "extra cost of the clay pot compared to flowers"
+        },
+        {
+          "name": "soil_discount",
+          "dtype": "float",
+          "description": "discount on the bag of soil compared to flowers"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "pot_cost",
+          "expr": "flower_cost + pot_extra",
+          "inputs": [
+            "flower_cost",
+            "pot_extra"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "soil_cost",
+          "expr": "flower_cost - soil_discount",
+          "inputs": [
+            "flower_cost",
+            "soil_discount"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_cost",
+          "expr": "flower_cost + pot_cost + soil_cost",
+          "inputs": [
+            "flower_cost",
+            "pot_cost",
+            "soil_cost"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "total_cost",
+          "inputs": [
+            "total_cost"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 6,
+    "mdl_gain": 24
+  },
+  "L11": {
+    "sub_id": "L11",
+    "program": {
+      "program_id": "gsm8k_p1343",
+      "slots": [
+        {
+          "name": "total_shoes",
+          "dtype": "float",
+          "description": "Total number of shoe pairs in the warehouse"
+        },
+        {
+          "name": "blue_shoes",
+          "dtype": "float",
+          "description": "Number of blue shoe pairs"
+        },
+        {
+          "name": "green_shoes",
+          "dtype": "float",
+          "description": "Number of green shoe pairs (equal to purple)"
+        },
+        {
+          "name": "purple_shoes",
+          "dtype": "float",
+          "description": "Number of purple shoe pairs"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "non_blue_shoes",
+          "expr": "total_shoes - blue_shoes",
+          "inputs": [
+            "total_shoes",
+            "blue_shoes"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "green_shoes",
+          "expr": "non_blue_shoes / 2",
+          "inputs": [
+            "non_blue_shoes"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "purple_shoes",
+          "expr": "green_shoes",
+          "inputs": [
+            "green_shoes"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "purple_shoes",
+          "inputs": [
+            "purple_shoes"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 6,
+    "mdl_gain": 24
+  },
+  "L12": {
+    "sub_id": "L12",
+    "program": {
+      "program_id": "gsm8k_p1515",
+      "slots": [
+        {
+          "name": "carl_weight",
+          "dtype": "float",
+          "description": "Carl's weight in pounds"
+        },
+        {
+          "name": "brad_extra",
+          "dtype": "float",
+          "description": "Extra weight Brad has over Carl"
+        },
+        {
+          "name": "billy_extra",
+          "dtype": "float",
+          "description": "Extra weight Billy has over Brad"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "brad_weight",
+          "expr": "carl_weight + brad_extra",
+          "inputs": [
+            "carl_weight",
+            "brad_extra"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "billy_weight",
+          "expr": "brad_weight + billy_extra",
+          "inputs": [
+            "brad_weight",
+            "billy_extra"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_check",
+          "expr": "billy_weight + 0",
+          "inputs": [
+            "billy_weight"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "total_check",
+          "inputs": [
+            "total_check"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 6,
+    "mdl_gain": 24
+  },
+  "L13": {
+    "sub_id": "L13",
+    "program": {
+      "program_id": "gsm8k_p45",
+      "slots": [
+        {
+          "name": "pi\u00f1ata_cost",
+          "dtype": "float",
+          "description": "Cost of the unicorn pi\u00f1ata"
+        },
+        {
+          "name": "reese_count",
+          "dtype": "float",
+          "description": "Number of bags of Reese's"
+        },
+        {
+          "name": "reese_price",
+          "dtype": "float",
+          "description": "Price per bag of Reese's"
+        },
+        {
+          "name": "snickers_count",
+          "dtype": "float",
+          "description": "Number of bags of Snickers"
+        },
+        {
+          "name": "snickers_price",
+          "dtype": "float",
+          "description": "Price per bag of Snickers"
+        },
+        {
+          "name": "skittles_count",
+          "dtype": "float",
+          "description": "Number of bags of Skittles"
+        },
+        {
+          "name": "skittles_price",
+          "dtype": "float",
+          "description": "Price per bag of Skittles"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "reese_total",
+          "expr": "reese_count * reese_price",
+          "inputs": [
+            "reese_count",
+            "reese_price"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "snickers_total",
+          "expr": "snickers_count * snickers_price",
+          "inputs": [
+            "snickers_count",
+            "snickers_price"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "skittles_total",
+          "expr": "skittles_count * skittles_price",
+          "inputs": [
+            "skittles_count",
+            "skittles_price"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "final",
+          "expr": "pi\u00f1ata_cost + reese_total + snickers_total + skittles_total",
+          "inputs": [
+            "pi\u00f1ata_cost",
+            "reese_total",
+            "snickers_total",
+            "skittles_total"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "final",
+          "inputs": [
+            "final"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 5,
+    "mdl_gain": 25
+  },
+  "L14": {
+    "sub_id": "L14",
+    "program": {
+      "program_id": "gsm8k_p94",
+      "slots": [
+        {
+          "name": "pages_per_day",
+          "dtype": "float",
+          "description": "pages John writes per day"
+        },
+        {
+          "name": "num_books",
+          "dtype": "float",
+          "description": "number of books to write"
+        },
+        {
+          "name": "pages_per_book",
+          "dtype": "float",
+          "description": "pages in each book"
+        },
+        {
+          "name": "total_pages",
+          "dtype": "float",
+          "description": "total pages across all books"
+        },
+        {
+          "name": "days_needed",
+          "dtype": "float",
+          "description": "days required to write all books"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "total_pages",
+          "expr": "num_books * pages_per_book",
+          "inputs": [
+            "num_books",
+            "pages_per_book"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "days_needed",
+          "expr": "total_pages / pages_per_day",
+          "inputs": [
+            "total_pages",
+            "pages_per_day"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "round_days",
+          "expr": "round(days_needed)",
+          "inputs": [
+            "days_needed"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "round_days",
+          "inputs": [
+            "round_days"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 5,
+    "mdl_gain": 20
+  },
+  "L15": {
+    "sub_id": "L15",
+    "program": {
+      "program_id": "gsm8k_p509",
+      "slots": [
+        {
+          "name": "price_per_kwh",
+          "dtype": "float",
+          "description": "electricity price per kilowatt-hour"
+        },
+        {
+          "name": "consumption_rate",
+          "dtype": "float",
+          "description": "oven consumption rate in kW"
+        },
+        {
+          "name": "usage_hours",
+          "dtype": "float",
+          "description": "total hours the oven was used"
+        },
+        {
+          "name": "total_kwh",
+          "dtype": "float",
+          "description": "total energy consumed in kWh"
+        },
+        {
+          "name": "total_cost",
+          "dtype": "float",
+          "description": "total cost to pay"
+        }
+      ],
+      "steps": [
+        {
+          "op": "compute",
+          "target": "total_kwh",
+          "expr": "consumption_rate * usage_hours",
+          "inputs": [
+            "consumption_rate",
+            "usage_hours"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "compute",
+          "target": "total_cost",
+          "expr": "price_per_kwh * total_kwh",
+          "inputs": [
+            "price_per_kwh",
+            "total_kwh"
+          ],
+          "target_dtype": "float"
+        },
+        {
+          "op": "output",
+          "target": "__output__",
+          "expr": "total_cost",
+          "inputs": [
+            "total_cost"
+          ],
+          "target_dtype": "float"
+        }
+      ],
+      "source": ""
+    },
+    "support": 5,
+    "mdl_gain": 15
+  }
+}
