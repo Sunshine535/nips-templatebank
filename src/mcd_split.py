@@ -183,6 +183,37 @@ def extract_compounds(plan_data: dict) -> Set[str]:
     return compounds
 
 
+def extract_compounds_true_dataflow(plan_data: dict) -> Set[str]:
+    """Extract compounds from GIFT DataflowPlan using ONLY explicit call_output edges.
+
+    Unlike extract_compounds() which uses consecutive-call adjacency,
+    this function only creates flow compounds when a BindingRef explicitly
+    references a previous call's output via source="call_output".
+    """
+    compounds = set()
+    calls = plan_data.get("calls", [])
+
+    call_ids = [c.get("call_id", f"c{i}") for i, c in enumerate(calls)]
+    sub_ids = [c.get("sub_id", "") for c in calls]
+    call_id_to_sub = {cid: sid for cid, sid in zip(call_ids, sub_ids)}
+
+    for i, call in enumerate(calls):
+        compounds.add(f"sub:{call.get('sub_id', '')}")
+        bindings = call.get("bindings", {})
+        for slot_name, ref in bindings.items():
+            if isinstance(ref, dict) and ref.get("source") == "call_output":
+                src_call_id = ref.get("call_id", "")
+                src_sub = call_id_to_sub.get(src_call_id, "?")
+                tgt_sub = call.get("sub_id", "")
+                compounds.add(f"true_flow:{src_sub}>{tgt_sub}")
+                compounds.add(f"flow_slot:{src_sub}.out>{tgt_sub}.{slot_name}")
+
+    if len(calls) >= 2:
+        compounds.add(f"multicall:{len(calls)}")
+
+    return compounds
+
+
 def compute_atom_tvd(split_a: List[Counter], split_b: List[Counter]) -> float:
     """Total variation distance of atom distributions."""
     total_a, total_b = Counter(), Counter()
