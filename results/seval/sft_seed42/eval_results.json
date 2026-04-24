@@ -1,0 +1,221 @@
+{
+  "correct": 42,
+  "executable": 50,
+  "parsed": 50,
+  "total": 50,
+  "details": [
+    {
+      "problem": "In a grocery store, Julia bought 2 pieces of Snickers and 3 packs of M&M's. If each piece of Snicker",
+      "answer": "8",
+      "predicted": "8.0"
+    },
+    {
+      "problem": "Police officer A patrols 36 streets in 4 hours. His colleague, officer B, patrols 55 streets in 5 ho",
+      "answer": "20",
+      "predicted": "20.0"
+    },
+    {
+      "problem": "Kim buys 3 pizzas.  They are 12 slices each.  The pizza cost $72.  How much did 5 slices cost?",
+      "answer": "10",
+      "predicted": "10.0"
+    },
+    {
+      "problem": "Gina is figuring out how much she'll have to spend on college this year. She's taking 14 credits tha",
+      "answer": "7100",
+      "predicted": "7100.0"
+    },
+    {
+      "problem": "Jason is climbing a telephone pole next to a tree his friend Matt is climbing. Matt can climb 6 feet",
+      "answer": "42",
+      "predicted": "42.0"
+    },
+    {
+      "problem": "Alice and Bob decided to bake cookies for their first date. Alice baked 74 chocolate chip cookies an",
+      "answer": "29",
+      "predicted": "29.0"
+    },
+    {
+      "problem": "Chastity made 12 angel food cakes to give to friends.  She placed the cakes in boxes, and then walke",
+      "answer": "3",
+      "predicted": "3.0"
+    },
+    {
+      "problem": "Gary has 30 grams of gold that cost $15 per gram. Anna has 50 grams of gold for the cost of $20 per ",
+      "answer": "1450",
+      "predicted": "1450.0"
+    },
+    {
+      "problem": "Carla spends 10 minutes sharpening her knife and 3 times that amount of time peeling vegetables. How",
+      "answer": "40",
+      "predicted": "40.0"
+    },
+    {
+      "problem": "The hobby store normally sells 21,122 trading cards per month. In June, the hobby store sold 3,922 m",
+      "answer": "46166",
+      "predicted": "46166.0"
+    },
+    {
+      "problem": "Mrs. Lim milks her cows twice a day. Yesterday morning, she got 68 gallons of milk and in the evenin",
+      "answer": "616",
+      "predicted": "616.0"
+    },
+    {
+      "problem": "Jake is retrieving the notes on a communal board, putting all of the red notes in the complaints bin",
+      "answer": "100",
+      "predicted": "100.0"
+    },
+    {
+      "problem": "In a 90-minute soccer game, Mark played 20 minutes, then rested after. He then played for another 35",
+      "answer": "35",
+      "predicted": "35.0"
+    },
+    {
+      "problem": "Natalie has $26 to go shopping. She bought a jumper for $9, a T-shirt for $4, and a pair of heels fo",
+      "answer": "8",
+      "predicted": "8.0"
+    },
+    {
+      "problem": "A lorry is 500 pounds when empty. What will its weight be if it's loaded with 20 bags of apples, eac",
+      "answer": "1700",
+      "predicted": "1700.0"
+    },
+    {
+      "problem": "Emma is 7 years old.  If her sister is 9 years older than her, how old will Emma be when her sister ",
+      "answer": "47",
+      "predicted": "47.0"
+    },
+    {
+      "problem": "Kira wants some new music on her phone. She downloads 10 songs in the morning. Later on that day, sh",
+      "answer": "140",
+      "predicted": "140.0"
+    },
+    {
+      "problem": "Sandy earns $15 per hour. She worked 10 hours on Friday with her best friend, 6 hours on Saturday al",
+      "answer": "450",
+      "predicted": "450.0"
+    },
+    {
+      "problem": "Team Soccer Stars plays in a soccer league. They played a total of 20 games, and won 14 games, lost ",
+      "answer": "46",
+      "predicted": "46.0"
+    },
+    {
+      "problem": "Mabel has 5 daisies in her garden, and each daisy has 8 petals.  If she gives 2 daisies to her teach",
+      "answer": "24",
+      "predicted": "24.0"
+    },
+    {
+      "problem": "Marnie makes bead bracelets. She bought 5 bags of 50 beads and 2 bags of 100 beads. If 50 beads are ",
+      "answer": "9",
+      "predicted": "9.0"
+    },
+    {
+      "problem": "Xavier needs 84 paper plates for a housewarming party. He already has 21 green plates and 28 red pla",
+      "answer": "35",
+      "predicted": "35.0"
+    },
+    {
+      "problem": "Todd has $20. He buys 4 candy bars that cost $2 each. How much money in dollars does Todd have left?",
+      "answer": "12",
+      "predicted": "12.0"
+    },
+    {
+      "problem": "Nate got lost looking for his car in the airport parking lot. He had to walk through every row in Se",
+      "answer": "30",
+      "predicted": "30.0"
+    },
+    {
+      "problem": "A hot dog stand sells 10 hot dogs every hour, each one selling for $2.  How many hours does the stan",
+      "answer": "10",
+      "predicted": "10.0"
+    },
+    {
+      "problem": "Legoland has 5 kangaroos for each koala. If Legoland has 180 kangaroos, how many koalas and kangaroo",
+      "answer": "216",
+      "predicted": "216.0"
+    },
+    {
+      "problem": "Alyssa and Abigail need to collect 100 empty cans for their Science project. As of today, Alyssa col",
+      "answer": "27",
+      "predicted": "27.0"
+    },
+    {
+      "problem": "Ocho has 8 friends and half are girls. His friends who are boys like to play theater with him. How m",
+      "answer": "4",
+      "predicted": "4.0"
+    },
+    {
+      "problem": "Alani earned $45 for 3 hours of baby-sitting. At the same rate, for how many hours would she need to",
+      "answer": "5",
+      "predicted": "5.0"
+    },
+    {
+      "problem": "From March to August, Sam made $460 doing 23 hours of yard work. However, from September to February",
+      "answer": "16",
+      "predicted": "16.0"
+    },
+    {
+      "problem": "If Clover goes for a 1.5-mile walk in the morning and another 1.5-mile walk in the evening, every da",
+      "answer": "90",
+      "predicted": "90.0"
+    },
+    {
+      "problem": "Carrie harvested 200 tomatoes and 350 carrots on her farm. If she can sell a tomato for $1 and a car",
+      "answer": "725",
+      "predicted": "725.0"
+    },
+    {
+      "problem": "There are 248 pages in a book. Joanna can read 16 pages per hour. On Monday, she reads for 3 hours. ",
+      "answer": "6",
+      "predicted": "6.0"
+    },
+    {
+      "problem": "While passing by a store, Miley noticed that a bag that cost $150 last week is now on sale for $135.",
+      "answer": "10",
+      "predicted": "10.0"
+    },
+    {
+      "problem": "The sky currently has 4 times as many cirrus clouds as cumulus clouds, and 12 times as many cumulus ",
+      "answer": "144",
+      "predicted": "144.0"
+    },
+    {
+      "problem": "At the Taylor family reunion, there were 45 kids and 123 adults. When they sat down to eat, there we",
+      "answer": "12",
+      "predicted": "12.0"
+    },
+    {
+      "problem": "A baker bought cooking ingredients in the supermarket. She bought 3 boxes of flour that cost $3 each",
+      "answer": "80",
+      "predicted": "80.0"
+    },
+    {
+      "problem": "Emily has 7 times as many oranges as Sandra. Sandra has 3 times as many oranges as Betty. If Betty h",
+      "answer": "252",
+      "predicted": "252.0"
+    },
+    {
+      "problem": "A busy port has 4 cruise ships and twice as many cargo ships. The number of sailboats is 6 more than",
+      "answer": "28",
+      "predicted": "28.0"
+    },
+    {
+      "problem": "Merry had 50 boxes of apples on Saturday and 25 boxes on Sunday. There were 10 apples in each box. I",
+      "answer": "3",
+      "predicted": "3.0"
+    },
+    {
+      "problem": "The Arevalo family went out to dinner. The smoky salmon costs $40, the black burger costs $15, and t",
+      "answer": "8",
+      "predicted": "8.0"
+    },
+    {
+      "problem": "Grace can read a 200-page book in 20 hours. How long would it take her to finish reading a 250-page ",
+      "answer": "25",
+      "predicted": "25.0"
+    }
+  ],
+  "accuracy": 0.84,
+  "parse_rate": 1.0,
+  "exec_rate": 1.0
+}
