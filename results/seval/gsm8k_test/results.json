@@ -1,0 +1,32 @@
+{
+  "base": {
+    "tag": "base",
+    "correct": 0,
+    "total": 200,
+    "accuracy": 0.0,
+    "parsed": 0,
+    "executable": 0,
+    "parse_rate": 0.0,
+    "exec_rate": 0.0
+  },
+  "sft": {
+    "tag": "sft",
+    "correct": 59,
+    "total": 200,
+    "accuracy": 0.295,
+    "parsed": 190,
+    "executable": 178,
+    "parse_rate": 0.95,
+    "exec_rate": 0.89
+  },
+  "grpo": {
+    "tag": "grpo",
+    "correct": 59,
+    "total": 200,
+    "accuracy": 0.295,
+    "parsed": 190,
+    "executable": 178,
+    "parse_rate": 0.95,
+    "exec_rate": 0.89
+  }
+}

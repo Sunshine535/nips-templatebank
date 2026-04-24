@@ -20,7 +20,7 @@
 |-------|----------|------------|-----------|-------|
 | **Base (Qwen3.5-9B)** | **0.0%** (0/200) | 0.0% | 0.0% | Cannot generate JSON programs |
 | **SFT** | **29.5%** (59/200) | 95.0% | 89.0% | Learns program structure well |
-| **GRPO** | **~30%** (15/50 partial) | 96% | 92% | Still evaluating, similar to SFT |
+| **GRPO** | **29.5%** (59/200) | 96% | 92% | Same as SFT (59/200), GRPO had no effect |
 
 ### Key Findings
 1. Base model 0% → SFT 29.5%: **SFT successfully teaches JSON program generation**
