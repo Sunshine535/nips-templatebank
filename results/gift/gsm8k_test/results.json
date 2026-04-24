@@ -1,0 +1,13 @@
+{
+  "model": "gift_sft_seed42",
+  "dataset": "gsm8k_test",
+  "samples": 200,
+  "gift_correct": 14,
+  "flat_fallback_correct": 0,
+  "total_correct": 14,
+  "accuracy": 0.07,
+  "method_accuracy": 0.07,
+  "parsed_gift": 199,
+  "parsed_flat": 0,
+  "exec_gift": 154
+}

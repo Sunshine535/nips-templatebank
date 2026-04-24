@@ -1,0 +1,13 @@
+{
+  "total": 697,
+  "single_call_faithful": 141,
+  "two_call_faithful": 0,
+  "no_match": 556,
+  "true_dataflow": 0,
+  "empty_binding": 0,
+  "active_binding_tested": 0,
+  "active_binding_passed": 0,
+  "gift_plans": 141,
+  "flat_faithful": 697,
+  "coverage": 0.20229555236728838
+}
