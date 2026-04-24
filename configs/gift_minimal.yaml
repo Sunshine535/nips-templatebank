@@ -1,0 +1,40 @@
+method: gift
+plan_schema: dataflow_v1
+require_explicit_bindings: true
+require_active_binding: true
+fallback_policy: report_only
+mcd_compounds: true_dataflow
+
+teacher:
+  model: "Qwen/Qwen3.5-27B"
+  enable_thinking: false
+  max_new_tokens: 512
+  samples_per_example: 1
+
+planner:
+  model: "Qwen/Qwen3.5-9B"
+  enable_thinking: false
+  dtype: "bf16"
+  lora:
+    r: 32
+    lora_alpha: 64
+    lora_dropout: 0.05
+
+training:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  num_train_epochs: 3
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03
+  bf16: true
+
+library:
+  main_size: 32
+  min_support_gsm8k: 3
+
+evaluation:
+  primary_metric: method_accuracy
+  report_fallback: true
+  require_adapters: true
+  seeds: [42, 123, 456]
