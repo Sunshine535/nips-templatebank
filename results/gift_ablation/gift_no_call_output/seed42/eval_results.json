@@ -1,0 +1,13 @@
+{
+  "variant": "gift_no_call_output",
+  "seed": 42,
+  "checkpoint": "results/gift_ablation/gift_no_call_output/seed42/model_final",
+  "dataset": "gsm8k_test",
+  "samples": 200,
+  "correct": 0,
+  "accuracy": 0.0,
+  "parsed": 188,
+  "parse_rate": 0.94,
+  "executable": 180,
+  "exec_rate": 0.9
+}

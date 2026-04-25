@@ -1,0 +1,13 @@
+{
+  "variant": "old_fragment_only",
+  "seed": 42,
+  "checkpoint": "results/gift_ablation/old_fragment_only/seed42/model_final",
+  "dataset": "gsm8k_test",
+  "samples": 200,
+  "correct": 60,
+  "accuracy": 0.3,
+  "parsed": 190,
+  "parse_rate": 0.95,
+  "executable": 176,
+  "exec_rate": 0.88
+}

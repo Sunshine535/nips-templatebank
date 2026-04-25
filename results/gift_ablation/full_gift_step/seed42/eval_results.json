@@ -1,0 +1,13 @@
+{
+  "variant": "full_gift_step",
+  "seed": 42,
+  "checkpoint": "results/gift_ablation/full_gift_step/seed42/model_final",
+  "dataset": "gsm8k_test",
+  "samples": 200,
+  "correct": 38,
+  "accuracy": 0.19,
+  "parsed": 195,
+  "parse_rate": 0.975,
+  "executable": 180,
+  "exec_rate": 0.9
+}

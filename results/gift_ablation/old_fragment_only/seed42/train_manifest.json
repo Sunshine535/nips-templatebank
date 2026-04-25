@@ -1,0 +1,15 @@
+{
+  "variant": "old_fragment_only",
+  "seed": 42,
+  "n_training_records": 697,
+  "step_data_sha256_prefix": "cd7fe6d16e02ad54",
+  "flat_data_sha256_prefix": "f344b4a5a21a1dbc",
+  "model": "/root/assets/models/Qwen3.5-9B",
+  "epochs": 3,
+  "lr": 0.0002,
+  "batch_size": 2,
+  "command": "scripts/train_ablation.py --variant old_fragment_only --seed 42 --output_dir results/gift_ablation/old_fragment_only/seed42 --step_data results/gift_step/compose_train_gift.json --flat_data results/templates_verified/all_programs.json --epochs 3",
+  "python_version": "3.10.12",
+  "torch_version": "2.10.0+cu128",
+  "git_commit": "fc018838c4"
+}

@@ -1,0 +1,13 @@
+{
+  "variant": "gift_no_active_gate",
+  "seed": 42,
+  "checkpoint": "results/gift_ablation/gift_no_active_gate/seed42/model_final",
+  "dataset": "gsm8k_test",
+  "samples": 200,
+  "correct": 37,
+  "accuracy": 0.185,
+  "parsed": 195,
+  "parse_rate": 0.975,
+  "executable": 187,
+  "exec_rate": 0.935
+}
