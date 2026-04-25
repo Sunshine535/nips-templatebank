@@ -21,3 +21,10 @@ V-GIFT: Value-Grounded Interface-Flow Template Composition
 - Value-supervised E=41.5% > flat D=29.5% (weak positive signal)
 - Dataflow mechanism is causally active: B1=0% vs C=19%
 - Edge activity: 94.3% call_output edges causally active
+
+## Novelty Gate Status: NOVELTY_RISK (conditional pass)
+
+Closest works: HintMR, Chain of Code, PAL/PoT/ToRA, Faithful CoT, MARIO.
+Required differentiation: typed reusable subroutine DAG + model-generated
+value hints + executable consistency verifier + active edge audit.
+Code provenance: NO_PROVENANCE_RISK_DETECTED — all main method code is original.

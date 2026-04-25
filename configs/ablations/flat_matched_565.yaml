@@ -1,0 +1,25 @@
+# Matched-data flat baseline: same 565 source programs as GIFT variants
+method: flat_sft_matched
+plan_schema: none
+require_explicit_bindings: false
+allow_call_output_refs: false
+use_value_hints: false
+gold_intermediates_allowed_eval: false
+fallback_policy: report_only
+
+planner:
+  model: "Qwen/Qwen3.5-9B"
+  dtype: "bf16"
+  lora: {r: 32, lora_alpha: 64, lora_dropout: 0.05}
+
+training:
+  per_device_train_batch_size: 2
+  num_train_epochs: 3
+  learning_rate: 2.0e-4
+  bf16: true
+
+evaluation:
+  primary_metric: method_accuracy
+  require_adapters: true
+  no_fallback: true
+  seeds: [42, 123, 456]
