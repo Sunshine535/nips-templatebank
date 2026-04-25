@@ -290,3 +290,196 @@ class DataflowExecutor:
                 return None
             return call_outputs[ref.call_id]
         return None
+
+
+# ============================================================
+# V-GIFT: Value-Grounded Interface-Flow Template Composition
+# ============================================================
+
+@dataclass
+class ValueHint:
+    """Model-generated intermediate value prediction for a plan call."""
+    value: Any = None
+    dtype: Optional[str] = None
+    confidence: Optional[float] = None
+
+    def to_dict(self) -> dict:
+        d = {}
+        if self.value is not None:
+            d["value"] = self.value
+        if self.dtype is not None:
+            d["dtype"] = self.dtype
+        if self.confidence is not None:
+            d["confidence"] = self.confidence
+        return d
+
+    @classmethod
+    def from_dict(cls, data) -> "ValueHint":
+        if data is None:
+            return cls()
+        if not isinstance(data, dict):
+            return cls(value=data)
+        return cls(
+            value=data.get("value"),
+            dtype=data.get("dtype"),
+            confidence=data.get("confidence"),
+        )
+
+
+@dataclass
+class ValueAnnotatedPlanCall(PlanCall):
+    """PlanCall with an optional model-generated value hint."""
+    value_hint: Optional[ValueHint] = None
+
+    def to_dict(self) -> dict:
+        d = super().to_dict()
+        if self.value_hint is not None:
+            d["value_hint"] = self.value_hint.to_dict()
+        return d
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ValueAnnotatedPlanCall":
+        bindings = {}
+        for k, v in data.get("bindings", {}).items():
+            if isinstance(v, dict):
+                bindings[k] = BindingRef.from_dict(v)
+            else:
+                bindings[k] = BindingRef(source="quantity", value=v)
+        vh = None
+        if "value_hint" in data and data["value_hint"] is not None:
+            vh = ValueHint.from_dict(data["value_hint"])
+        return cls(
+            call_id=data["call_id"],
+            sub_id=data["sub_id"],
+            bindings=bindings,
+            value_hint=vh,
+        )
+
+
+@dataclass
+class ValueAnnotatedDataflowPlan(DataflowPlan):
+    """DataflowPlan where each call may carry a value hint."""
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ValueAnnotatedDataflowPlan":
+        calls = []
+        for c in data.get("calls", []):
+            if "value_hint" in c:
+                calls.append(ValueAnnotatedPlanCall.from_dict(c))
+            else:
+                calls.append(PlanCall.from_dict(c))
+        final = None
+        if "final" in data and data["final"] is not None:
+            final = BindingRef.from_dict(data["final"])
+        plan = cls(calls=calls, final=final)
+        return plan
+
+
+class ConsistencyExecutor:
+    """Execute a ValueAnnotatedDataflowPlan and check value hint consistency.
+
+    Returns both symbolic execution result and value-hint-based result,
+    plus per-call consistency diagnostics.
+    """
+
+    def __init__(self, library: SubroutineLibrary):
+        self.library = library
+        self.executor = Executor()
+
+    def execute(self, plan: ValueAnnotatedDataflowPlan,
+                quantities: Optional[dict] = None) -> dict:
+        """Execute and return comprehensive diagnostics."""
+        quantities = quantities or {}
+        result = {
+            "symbolic_exec_ok": False,
+            "symbolic_result": None,
+            "value_hint_result": None,
+            "per_call": [],
+            "consistency_errors": 0,
+            "total_calls": len(plan.calls),
+            "value_hints_present": 0,
+            "value_hints_consistent": 0,
+            "final_agreement": False,
+        }
+
+        call_outputs = {}
+        for call in plan.calls:
+            sub = self.library.get(call.sub_id)
+            if sub is None:
+                result["per_call"].append({
+                    "call_id": call.call_id, "error": f"unknown sub {call.sub_id}",
+                })
+                return result
+
+            required_slots = {s.name for s in sub.program.slots}
+            call_bindings = {}
+            for slot_name, ref in call.bindings.items():
+                if slot_name not in required_slots:
+                    continue
+                if ref.source == "quantity":
+                    val = quantities.get(ref.qid, ref.value) if ref.qid else ref.value
+                elif ref.source == "constant":
+                    val = ref.value
+                elif ref.source == "call_output":
+                    val = call_outputs.get(ref.call_id)
+                else:
+                    val = None
+                if val is None:
+                    result["per_call"].append({
+                        "call_id": call.call_id,
+                        "error": f"cannot resolve {slot_name}",
+                    })
+                    return result
+                call_bindings[slot_name] = val
+
+            ok, exec_result, _ = self.executor.execute(sub.program, call_bindings)
+            call_info = {
+                "call_id": call.call_id,
+                "sub_id": call.sub_id,
+                "exec_ok": ok,
+                "exec_result": exec_result,
+            }
+
+            if ok and exec_result is not None:
+                call_outputs[call.call_id] = exec_result
+
+            if isinstance(call, ValueAnnotatedPlanCall) and call.value_hint is not None:
+                result["value_hints_present"] += 1
+                hint_val = call.value_hint.value
+                call_info["value_hint"] = hint_val
+                if ok and exec_result is not None and hint_val is not None:
+                    try:
+                        diff = abs(float(exec_result) - float(hint_val))
+                        consistent = diff < max(abs(float(exec_result)) * 0.01, 1e-3)
+                    except (ValueError, TypeError):
+                        consistent = str(exec_result) == str(hint_val)
+                    call_info["consistent"] = consistent
+                    if consistent:
+                        result["value_hints_consistent"] += 1
+                    else:
+                        result["consistency_errors"] += 1
+
+            result["per_call"].append(call_info)
+
+        if call_outputs:
+            last_id = plan.calls[-1].call_id
+            result["symbolic_result"] = call_outputs.get(last_id)
+            result["symbolic_exec_ok"] = True
+
+        if plan.final is not None:
+            if plan.final.source == "call_output" and plan.final.call_id in call_outputs:
+                result["symbolic_result"] = call_outputs[plan.final.call_id]
+
+        last_call = plan.calls[-1] if plan.calls else None
+        if isinstance(last_call, ValueAnnotatedPlanCall) and last_call.value_hint is not None:
+            result["value_hint_result"] = last_call.value_hint.value
+
+        if result["symbolic_result"] is not None and result["value_hint_result"] is not None:
+            try:
+                s = float(result["symbolic_result"])
+                v = float(result["value_hint_result"])
+                result["final_agreement"] = abs(s - v) < max(abs(s) * 0.01, 1e-3)
+            except (ValueError, TypeError):
+                result["final_agreement"] = str(result["symbolic_result"]) == str(result["value_hint_result"])
+
+        return result

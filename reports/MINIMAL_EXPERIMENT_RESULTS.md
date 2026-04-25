@@ -1,25 +1,28 @@
-# Minimal Experiment Results
+# Minimal Experiment Results (Updated R4)
 
-| Experiment | Config | Dataset | Seed | Metric | Result | Expected | Pass/Fail | Interpretation |
-|------------|--------|---------|------|--------|--------|----------|-----------|----------------|
-| Smoke test (pytest) | — | — | — | 41/41 pass | PASS | all pass | PASS | Codebase stable |
-| Plan audit | — | templates_verified | — | empty_binding_rate | 98.1% | ~98% | PASS | Confirms GPT-5.5 diagnosis |
-| Plan audit: single_call | — | templates_verified | — | single_call_rate | 100% | ~100% | PASS | No composition in old data |
-| Plan audit: subs used | — | templates_verified | — | unique_subs | 3/16 | few | PASS | Library collapse confirmed |
-| SFT training | train_seval sft | 697 GSM8K programs | 42 | train_loss | 0.060 | <0.1 | PASS | Model learns format |
-| SFT train eval | train_seval sft | GSM8K train subset | 42 | accuracy | 84.0% | >50% | PASS | Overfitting expected |
-| GRPO training | train_seval grpo | 697 GSM8K programs | 42 | mean_reward | 0.80-0.94 | >0.5 | PASS | Reward saturated |
-| GRPO train eval | train_seval grpo | GSM8K train subset | 42 | accuracy | 84.0% | ≥SFT | PASS | No improvement (saturated) |
-| Base GSM8K test | — | GSM8K test 200 | 42 | accuracy | 0.0% | ~0% | PASS | Base cannot generate JSON |
-| **SFT GSM8K test** | train_seval sft | GSM8K test 200 | 42 | accuracy | **29.5%** | >0% | PASS | First positive result |
-| SFT parse rate | train_seval sft | GSM8K test 200 | 42 | parse_rate | 95.0% | >50% | PASS | Format learnable |
-| SFT exec rate | train_seval sft | GSM8K test 200 | 42 | exec_rate | 89.0% | >50% | PASS | Programs structurally valid |
-| GRPO GSM8K test | train_seval grpo | GSM8K test 200 | 42 | accuracy | 29.5% | ≥SFT | PASS | = SFT, no improvement |
-| GIFT data build | — | 697 programs | — | faithful_coverage | 20.2% | >30% | **WARN** | Below threshold |
-| GIFT data: faithful plans | — | 697 programs | — | gift_plans | 141 | >200 | **WARN** | Library too coarse |
-| GIFT data: two-call flow | — | 697 programs | — | true_dataflow | 0 | >0 | **FAIL** | No multi-call plans |
-| GIFT SFT training | gift_minimal | 141 GIFT plans | 42 | train_loss | 0.194 | <0.3 | PASS | Learns GIFT format |
-| **GIFT GSM8K test** | gift_minimal | GSM8K test 200 | 42 | accuracy | **7.0%** | >29.5% | **FAIL** | C < A |
-| GIFT parse rate | gift_minimal | GSM8K test 200 | 42 | parse_rate | 99.5% | >90% | PASS | Format highly learnable |
-| GIFT exec rate | gift_minimal | GSM8K test 200 | 42 | exec_rate | 77.0% | >80% | WARN | Binding issues |
-| A vs C comparison | — | GSM8K test 200 | 42 | A=29.5% C=7.0% | C < A | C > A | **FAIL** | GIFT not competitive yet |
+## Complete 6-Variant Ablation — GSM8K Test 200, seed 42, commit 75329c4
+
+| # | Variant | Format | Data | Accuracy | Parse | Exec | Correct | Interpretation |
+|---|---------|--------|------|----------|-------|------|---------|----------------|
+| A | old_fragment_only | flat JSON | 697 | **30.0%** | 95% | 88% | 60/200 | Flat baseline (697) |
+| D | flat_matched_565 | flat JSON | 565 | **29.5%** | 97% | 91% | 59/200 | Matched-data flat |
+| **E** | **value_supervised_plan** | **GIFT+constants** | **565** | **41.5%** | **94%** | **88%** | **83/200** | **Best: plan structure + value supervision** |
+| C | full_gift_step | GIFT+refs | 565 | 19.0% | 98% | 90% | 38/200 | Symbolic refs too hard |
+| B2 | gift_no_active_gate | GIFT (no gate) | 565 | 18.5% | 98% | 94% | 37/200 | Gate minimal effect |
+| B1 | gift_no_call_output | GIFT (no refs) | 565 | 0.0% | 94% | 90% | 0/200 | Confirms refs are causal |
+
+## Mechanism Audit (v2, step-primitive data)
+
+| Metric | Value |
+|--------|-------|
+| GIFT plan coverage | 81.1% (565/697) |
+| true_dataflow_rate (correct plans) | 100% |
+| Quantity binding active rate | 97.3% |
+| Call-output edge active rate | 94.3% |
+
+## Limitations
+- Seed 42 only (no 123/456)
+- First 200 GSM8K test samples (not full 1319)
+- No official baselines (PAL/BoT/Faithful CoT)
+- E is training-time value supervision, not test-time oracle — but leakage audit pending
+- All results are weak signal, not paper claims

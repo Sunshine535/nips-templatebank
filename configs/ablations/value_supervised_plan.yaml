@@ -1,0 +1,45 @@
+# E variant / V-GIFT value-only control
+# GIFT plan format with teacher-derived intermediate values as constants in training.
+# At eval, model generates the plan including value constants — no gold injection.
+
+method: vgift
+plan_schema: value_annotated_dataflow_v1
+require_explicit_bindings: true
+allow_call_output_refs: false
+use_value_hints: true
+value_hints_source: model_generated_at_inference
+gold_intermediates_allowed_train: true
+gold_intermediates_allowed_eval: false
+fallback_policy: report_only
+mcd_compounds: true_dataflow
+
+teacher:
+  model: "Qwen/Qwen3.5-27B"
+  enable_thinking: false
+  max_new_tokens: 512
+
+planner:
+  model: "Qwen/Qwen3.5-9B"
+  enable_thinking: false
+  dtype: "bf16"
+  lora:
+    r: 32
+    lora_alpha: 64
+    lora_dropout: 0.05
+
+training:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  num_train_epochs: 3
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.03
+  bf16: true
+  training_data: "results/gift_step_v2/compose_train_gift.json"
+  library_path: "results/gift_step_v2/library_gift.json"
+
+evaluation:
+  primary_metric: method_accuracy
+  require_adapters: true
+  no_fallback: true
+  seeds: [42, 123, 456]

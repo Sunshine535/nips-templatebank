@@ -1,86 +1,53 @@
-# Next GPT-5.5 Pro Review Package
+# Next GPT-5.5 Pro Review Package (R4 Update)
 
-## Summary of Changes
+## Summary of Changes Since Last Review
 
-### Implemented (Tasks 2,3,4,5,9)
-1. **GIFT core module** (`src/dataflow_plan.py`): BindingRef, DataflowPlan, PlanCall, DataflowExecutor — 10/10 tests pass
-2. **Plan faithfulness audit**: Confirmed 98% empty bindings in old data, 100% single-call, only 3/16 subs used
-3. **Faithful GIFT data**: 141/697 (20.2%) programs have faithful explicit-binding plans
-4. **GIFT config**: `configs/gift_minimal.yaml` with require_explicit_bindings=true
-5. **Archive manifest**: All old results labeled with reliability status
+### New Variants Trained and Evaluated (seed 42, GSM8K test 200)
+- **D (flat_matched_565)**: 29.5% — matched-data flat baseline confirms data size not the issue
+- **E (value_supervised_plan)**: 41.5% — GIFT plan format with oracle intermediate values as constants
+- A/B1/B2/C retrained under frozen commit 75329c4
 
-### Not Yet Implemented (Tasks 6,7,8)
-- Task 6: MCD compound rewrite (true dataflow) — code not changed
-- Task 7: Eval reliability (--require_adapters, --no_fallback) — code not changed
-- Task 8: Training reproducibility (--seed, --no_resume, hashes) — code not changed
+### Bug Fixes
+- Audit counting bug fixed: `true_dataflow_rate` now ≤1.0 (was 1.03)
+- Edge-level call_output activity audit added: 94.3% edges causally active
+- Duplicate YAML key fixed: `library` → `library_path` + `library_config`
+- Config integrity tests added (9 tests, duplicate key detection)
 
-### Prior Bug Fixes (before GPT-5.5 diagnosis)
-- Empty bindings → permutation search
-- Executor ambiguous binding → reject
-- Library collapse → slot count + subsequence mining
-- train_seval.py → complete rewrite
-- Container OOM → 128GB
-- Log buffering → python3 -u + explicit flush
+### Key Finding
+**E = 41.5% reveals the successor path**: GIFT DataflowPlan format + explicit intermediate values beats flat programs by +12pt. The plan STRUCTURE helps, but the model cannot infer call_output values at this scale (C=19%).
 
-## Result Tables
+## Result Table
 
-### GSM8K Test Set (200 samples, seed 42)
+| Variant | Accuracy | Notes |
+|---------|----------|-------|
+| A: old_fragment_only (697) | 30.0% | Flat baseline |
+| D: flat_matched_565 (565) | 29.5% | Data-matched flat |
+| **E: value_supervised_plan** | **41.5%** | **Best — GIFT + value constants** |
+| C: full_gift_step | 19.0% | Symbolic refs only |
+| B2: gift_no_active_gate | 18.5% | ≈ C |
+| B1: gift_no_call_output | 0.0% | Mechanism causal |
 
-| Variant | Accuracy | Parse | Exec | Training Data |
-|---------|----------|-------|------|---------------|
-| Base Qwen3.5-9B | 0.0% | 0% | 0% | — |
-| A. Flat SFT | **29.5%** | 95% | 89% | 697 flat programs |
-| A. Flat GRPO | 29.5% | 95% | 89% | 697 + 500 GRPO steps |
-| C. GIFT SFT | 7.0% | 99.5% | 77% | 141 GIFT plans |
+## What Supports the Diagnosis
+1. Dataflow mechanism is causally active (B1=0% vs C=19%, edge audit 94.3%)
+2. Plan structure helps when values are grounded (E=41.5% > D=29.5%)
+3. Pure symbolic inference is the bottleneck, not the architecture
 
-### GIFT Data Audit
-
-| Metric | Value |
-|--------|-------|
-| Total programs | 697 |
-| Faithful GIFT plans | 141 (20.2%) |
-| Single-call plans | 141 |
-| Two-call (true dataflow) | 0 |
-| Empty bindings (old data) | 98.1% |
-
-## What Supports the Original Diagnosis
-1. **98% empty bindings confirmed** — exactly as diagnosed
-2. **100% single-call** — no composition in old data
-3. **GIFT format is learnable** — 99.5% parse rate proves DataflowPlan works
-4. **Implicit binding is the root cause** — old compose 2% vs 0% on MCD, flat 5%
-
-## What Contradicts or Weakens the Diagnosis
-1. **GIFT (7%) < Flat SFT (29.5%)** — the new mechanism does not yet outperform
-2. **20.2% faithful coverage** — below the 30% threshold diagnostic recommended
-3. **Zero two-call plans** — the library cannot produce true multi-call composition
-4. **Flat SFT is a strong baseline** — 29.5% with just 697 programs and simple format
-
-## Mechanism Logs
-- GIFT parse rate 99.5% — model learns DataflowPlan format
-- GIFT exec rate 77% — explicit bindings work but library coverage limits execution
-- Active binding perturbation not yet systematically tested (planned, not implemented)
-
-## Failed Tests
-- GIFT coverage < 30% → library mining too coarse
-- C < A → GIFT not competitive with flat SFT
-- Zero two-call dataflow → no true composition
+## What Contradicts or Weakens
+1. C < A: symbolic GIFT still loses to flat
+2. B2 ≈ C: active-binding gate doesn't help
+3. E is one seed / 200 samples / no leakage audit yet
 
 ## Unresolved Questions
-1. Can finer subroutine mining (step-level primitives) push GIFT coverage >50%?
-2. Would more verified programs (2000+) make both flat SFT and GIFT competitive?
-3. Is the library composition approach fundamentally limited vs flat program generation?
-4. Would Type-Local GRPO (step-level credit assignment) help where outcome-GRPO failed?
-
-## What GPT-5.5 Pro Should Review Next
-1. **Is the 20.2% GIFT coverage a methodology failure or a data/mining failure?**
-   - If mining: pivot to step-level primitives instead of whole-program subroutines
-   - If methodology: the composition approach may be inferior to flat programs
-2. **Should we pursue GIFT with more data, or focus on scaling flat SFT/GRPO?**
-   - Flat SFT at 29.5% with 697 programs → what would 5000 programs achieve?
-3. **The GIFT mechanism works (99.5% parse) but the library is the bottleneck.**
-   - Recommend: mine smaller, more composable primitives (2-3 step subroutines)
-4. **Tasks 6,7,8 still needed** — MCD rewrite, eval reliability, training reproducibility
-5. **Multi-seed evaluation** — all results are seed 42 only
+1. Does E have test-time gold leakage? (likely no, audit pending)
+2. Can V-GIFT (model-generated value hints) match E without oracle?
+3. Is the +12pt signal stable across seeds?
+4. Can it generalize beyond GSM8K?
 
 ## Decision
-**DEBUG MORE** — GIFT mechanism is sound (99.5% parse proves it), but library mining is too coarse (20.2% coverage, zero two-call plans). The bottleneck is data construction, not the GIFT architecture.
+Implement V-GIFT successor path: value-grounded dataflow plans with model-generated intermediate value annotations and consistency checks.
+
+## What GPT-5.5 Should Review Next
+1. V-GIFT schema implementation (ValueAnnotatedDataflowPlan)
+2. Leakage audit result for E
+3. V-GIFT seed 42 gate results (F vs A vs E vs no-mechanism)
+4. Multi-seed stability if gate passes

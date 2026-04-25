@@ -1,17 +1,16 @@
-# Remaining Risks
+# Remaining Risks (Updated R4)
 
-| Risk | Severity | Impact | Mitigation |
+| Risk | Severity | Status | Mitigation |
 |------|----------|--------|------------|
-| GIFT coverage 20.2% (below 30%) | HIGH | Insufficient training data for GIFT to compete | Need finer subroutine mining or step-level primitives |
-| Library mining too coarse | HIGH | Only 141/697 programs match any subroutine faithfully | Recompute library with semantic interfaces, not just op signature |
-| Zero two-call dataflow plans | HIGH | No true composition in GIFT data | Need subroutines that compose (shorter, complementary) |
-| Only GSM8K evaluated | HIGH | No MATH results, paper needs multi-dataset | Extract MATH programs, evaluate on MATH test |
-| Only seed 42 | HIGH | Results may be seed-dependent | Run seeds 42, 123, 456 with CI |
-| No official baselines | HIGH | Cannot claim superiority without PAL, BoT, Faithful CoT | Implement official baselines at matched compute |
-| Flat SFT overfits (84% → 29.5%) | MEDIUM | Need more training data or regularization | Extract more programs, data augmentation |
-| GRPO no improvement | MEDIUM | Execution reward saturated on small data | Need larger dataset or Type-Local credit assignment |
-| Eval fallback masking | MEDIUM | method_accuracy not separated from fallback | Task 7 (eval reliability fix) not yet applied |
-| Training reproducibility | MEDIUM | Missing seed control, checkpoint manifests | Task 8 (training fix) not yet applied |
-| MCD compounds from adjacency | MEDIUM | Split doesn't test real composition | Task 6 (MCD rewrite) not yet applied |
-| Placeholder citations in PAPERS.md | LOW | Academic integrity issue | Mark as unverified or remove |
-| Template algebra dead code | LOW | Confusion risk | Archived in manifest |
+| E may have test-time value leakage | HIGH | **Leakage audit pending** | Run check_value_leakage.py; if found, E invalid |
+| Only seed 42 | HIGH | Pending | Run seeds 123, 456 after gate |
+| Only first 200 GSM8K test samples | MEDIUM | Pending | Full test after multi-seed gate |
+| No official baselines (PAL/BoT/FCoT) | HIGH | Not started | Add before paper claims |
+| C (symbolic refs) < A (flat) | HIGH | **Confirmed negative** | C is ablation, not main method |
+| E "oracle" naming misleading | MEDIUM | Renaming to value_supervised_plan | Config added |
+| Stale PAPERS.md placeholders | MEDIUM | Warning added | Remove before paper |
+| V-GIFT not yet implemented | HIGH | **Task 3 pending** | Implement ValueAnnotatedDataflowPlan |
+| No MATH/BBH evaluation | HIGH | Pending | After GSM8K gates pass |
+| Active-binding gate shows no effect | MEDIUM | B2≈C on seed 42 | May help at larger scale |
+| Prediction logs not yet committed for all variants | MEDIUM | Pending rerun with --predictions_out | Task 4 |
+| Train-split-only library not enforced | HIGH | Current library uses all 697 | Must fix before MCD claims |
