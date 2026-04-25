@@ -1,0 +1,12 @@
+{
+  "data_file": "results/gift_step_v2/compose_train_gift.json",
+  "n_plans_executed": 565,
+  "quantity_tested": 2264,
+  "quantity_active": 2204,
+  "quantity_dead": 60,
+  "quantity_active_rate": 0.9734982332155477,
+  "call_output_edges_tested": 1300,
+  "call_output_edges_active": 1226,
+  "call_output_edges_dead": 74,
+  "call_output_edge_active_rate": 0.943076923076923
+}

@@ -1,5 +1,5 @@
 {
-  "variant": "full_gift_step",
+  "variant": "flat_matched_565",
   "seed": 42,
   "n_training_records": 565,
   "step_data_sha256_prefix": "cd7fe6d16e02ad54",
@@ -8,7 +8,7 @@
   "epochs": 3,
   "lr": 0.0002,
   "batch_size": 2,
-  "command": "scripts/train_ablation.py --variant full_gift_step --seed 42 --output_dir results/gift_ablation/full_gift_step/seed42 --step_data results/gift_step_v2/compose_train_gift.json --flat_data results/templates_verified/all_programs.json --epochs 3",
+  "command": "scripts/train_ablation.py --variant flat_matched_565 --seed 42 --output_dir results/gift_ablation/flat_matched_565/seed42 --step_data results/gift_step_v2/compose_train_gift.json --flat_data results/templates_verified/all_programs.json --epochs 3",
   "python_version": "3.10.12",
   "torch_version": "2.10.0+cu128",
   "git_commit": "75329c4742"
