@@ -382,7 +382,7 @@ def main():
 
     if coverage < 0.30:
         logger.warning("COVERAGE BELOW 30%% (%.1f%%)", 100 * coverage)
-    if audit["multi_call_true_dataflow"] == 0:
+    if audit["multi_call_true_dataflow_correct"] == 0:
         logger.warning("ZERO MULTI-CALL TRUE DATAFLOW — mechanism not active")
     logger.info("Saved to %s", args.output_dir)
 
