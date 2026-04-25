@@ -1,0 +1,30 @@
+# V-GIFT Full: refs + value_hints + consistency gate (Successor MAIN METHOD)
+method: vgift
+plan_schema: value_annotated_dataflow_v1
+require_explicit_bindings: true
+allow_call_output_refs: true
+use_value_hints: true
+consistency_gate: true
+gold_intermediates_allowed_train: true
+gold_intermediates_allowed_eval: false
+fallback_policy: report_only
+mcd_compounds: true_dataflow
+
+planner:
+  model: "Qwen/Qwen3.5-9B"
+  dtype: "bf16"
+  lora: {r: 32, lora_alpha: 64, lora_dropout: 0.05}
+
+training:
+  per_device_train_batch_size: 2
+  num_train_epochs: 3
+  learning_rate: 2.0e-4
+  bf16: true
+  training_data: "results/gift_step_v2/compose_train_gift.json"
+  library_path: "results/gift_step_v2/library_gift.json"
+
+evaluation:
+  primary_metric: method_accuracy
+  require_adapters: true
+  no_fallback: true
+  seeds: [42, 123, 456]

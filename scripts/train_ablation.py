@@ -196,6 +196,67 @@ def build_records(variant: str, tokenizer, step_data_path: str, flat_data_path: 
             )
             records.append({"text": text})
 
+    elif variant == "vgift_value_only":
+        # Same as gift_no_explicit_refs_oracle_values (E control)
+        return build_records("gift_no_explicit_refs_oracle_values", tokenizer,
+                             step_data_path, flat_data_path)
+
+    elif variant == "vgift_no_value_hints":
+        # Same as full_gift_step (C control — refs only, no value hints)
+        return build_records("full_gift_step", tokenizer,
+                             step_data_path, flat_data_path)
+
+    elif variant == "vgift_no_consistency":
+        # Refs + value hints but no consistency gate in labels
+        # (same data as vgift_full, consistency is an eval-time concept)
+        return build_records("vgift_full", tokenizer,
+                             step_data_path, flat_data_path)
+
+    elif variant == "vgift_full":
+        # Full V-GIFT: refs + value_hint annotations per call
+        data = json.load(open(step_data_path))
+        from src.dataflow_plan import DataflowExecutor, DataflowPlan
+        from src.template_dsl import SubroutineLibrary
+        lib_path = step_data_path.replace("compose_train_gift.json", "library_gift.json")
+        library = SubroutineLibrary.load(lib_path)
+        executor = DataflowExecutor(library)
+        for item in data:
+            plan_dict = json.loads(json.dumps(item["plan"]))
+            quantities = item.get("quantities", {})
+            qty_map = {qid: q["value"] for qid, q in quantities.items()}
+            plan_obj = DataflowPlan.from_dict(plan_dict)
+            call_outputs = {}
+            for call in plan_obj.calls:
+                sub = library.get(call.sub_id)
+                if sub is None:
+                    break
+                args_d = {}
+                for slot_name, ref in call.bindings.items():
+                    if ref.source == "quantity":
+                        args_d[slot_name] = qty_map.get(ref.qid, ref.value)
+                    elif ref.source == "call_output":
+                        args_d[slot_name] = call_outputs.get(ref.call_id)
+                    else:
+                        args_d[slot_name] = ref.value
+                ok, result, _ = executor.executor.execute(sub.program, args_d)
+                if ok and result is not None:
+                    call_outputs[call.call_id] = result
+            # Add value_hint to each call in the plan
+            for call in plan_dict["calls"]:
+                cid = call["call_id"]
+                if cid in call_outputs:
+                    call["value_hint"] = {"value": call_outputs[cid]}
+            plan_json = json.dumps(plan_dict, ensure_ascii=False)
+            prompt = f"Problem: {item['problem']}\n\nGenerate a value-annotated dataflow plan (JSON):"
+            messages = [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": plan_json},
+            ]
+            text = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=False,
+            )
+            records.append({"text": text})
+
     else:
         raise ValueError(f"Unknown variant: {variant}")
 
@@ -208,7 +269,9 @@ def main():
                         choices=["old_fragment_only", "flat_matched_565",
                                  "gift_no_call_output", "gift_no_active_gate",
                                  "gift_no_explicit_refs_oracle_values",
-                                 "full_gift_step"])
+                                 "full_gift_step",
+                                 "vgift_full", "vgift_no_value_hints",
+                                 "vgift_no_consistency", "vgift_value_only"])
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--model", default="/root/assets/models/Qwen3.5-9B")

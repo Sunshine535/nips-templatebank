@@ -81,7 +81,9 @@ def main():
                         choices=["old_fragment_only", "flat_matched_565",
                                  "gift_no_call_output", "gift_no_active_gate",
                                  "gift_no_explicit_refs_oracle_values",
-                                 "full_gift_step"])
+                                 "full_gift_step",
+                                 "vgift_full", "vgift_no_value_hints",
+                                 "vgift_no_consistency", "vgift_value_only"])
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--library",
@@ -95,6 +97,7 @@ def main():
     args = parser.parse_args()
 
     is_dataflow = args.variant not in ("old_fragment_only", "flat_matched_565")
+    is_vgift = args.variant.startswith("vgift_")
 
     ds = load_dataset("openai/gsm8k", "main", split="test")
     test_data = list(ds)[:args.max_samples]
