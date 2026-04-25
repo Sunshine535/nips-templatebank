@@ -1,0 +1,13 @@
+{
+  "variant": "gift_no_explicit_refs_oracle_values",
+  "seed": 42,
+  "checkpoint": "results/gift_ablation/gift_no_explicit_refs_oracle_values/seed42/model_final",
+  "dataset": "gsm8k_test",
+  "samples": 200,
+  "correct": 83,
+  "accuracy": 0.415,
+  "parsed": 188,
+  "parse_rate": 0.94,
+  "executable": 175,
+  "exec_rate": 0.875
+}

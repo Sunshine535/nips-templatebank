@@ -1,0 +1,13 @@
+{
+  "variant": "flat_matched_565",
+  "seed": 42,
+  "checkpoint": "results/gift_ablation/flat_matched_565/seed42/model_final",
+  "dataset": "gsm8k_test",
+  "samples": 200,
+  "correct": 59,
+  "accuracy": 0.295,
+  "parsed": 194,
+  "parse_rate": 0.97,
+  "executable": 182,
+  "exec_rate": 0.91
+}
