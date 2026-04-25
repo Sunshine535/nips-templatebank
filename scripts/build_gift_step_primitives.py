@@ -274,10 +274,12 @@ def main():
     audit = {
         "total": len(programs),
         "plan_built": 0,
+        "plan_built_multi_call_dataflow": 0,
+        "plan_built_two_call_dataflow": 0,
         "plan_executed": 0,
         "plan_correct": 0,
-        "two_call_true_dataflow": 0,
-        "multi_call_true_dataflow": 0,
+        "multi_call_true_dataflow_correct": 0,
+        "two_call_true_dataflow_correct": 0,
         "call_counts": Counter(),
         "library_size": library.size,
     }
@@ -289,10 +291,12 @@ def main():
             continue
         audit["plan_built"] += 1
         audit["call_counts"][len(plan.calls)] += 1
-        if len(plan.calls) >= 2 and plan.has_true_dataflow():
-            audit["multi_call_true_dataflow"] += 1
-            if len(plan.calls) == 2:
-                audit["two_call_true_dataflow"] += 1
+        is_multi_dataflow = len(plan.calls) >= 2 and plan.has_true_dataflow()
+        is_two_dataflow = len(plan.calls) == 2 and plan.has_true_dataflow()
+        if is_multi_dataflow:
+            audit["plan_built_multi_call_dataflow"] += 1
+        if is_two_dataflow:
+            audit["plan_built_two_call_dataflow"] += 1
 
         ok, result, stats = executor.execute_with_quantities(
             plan, {qid: q["value"] for qid, q in quantities.items()}
@@ -301,6 +305,10 @@ def main():
             audit["plan_executed"] += 1
             if answer_matches(result, item["answer"]):
                 audit["plan_correct"] += 1
+                if is_multi_dataflow:
+                    audit["multi_call_true_dataflow_correct"] += 1
+                if is_two_dataflow:
+                    audit["two_call_true_dataflow_correct"] += 1
                 faithful_plans.append({
                     "problem": item["problem"],
                     "answer": item["answer"],
@@ -314,17 +322,23 @@ def main():
 
         if (i + 1) % 100 == 0:
             logger.info(
-                "  %d/%d: built=%d, executed=%d, correct=%d, multicall_flow=%d",
+                "  %d/%d: built=%d, executed=%d, correct=%d, multicall_flow_correct=%d",
                 i + 1, len(programs),
                 audit["plan_built"], audit["plan_executed"],
-                audit["plan_correct"], audit["multi_call_true_dataflow"],
+                audit["plan_correct"], audit["multi_call_true_dataflow_correct"],
             )
 
     audit["call_counts"] = dict(audit["call_counts"])
     coverage = audit["plan_correct"] / max(audit["total"], 1)
     audit["coverage"] = coverage
     audit["true_dataflow_rate"] = (
-        audit["multi_call_true_dataflow"] / max(audit["plan_correct"], 1)
+        audit["multi_call_true_dataflow_correct"] / max(audit["plan_correct"], 1)
+    )
+    assert 0.0 <= audit["true_dataflow_rate"] <= 1.0, (
+        f"true_dataflow_rate out of range: {audit['true_dataflow_rate']}"
+    )
+    assert audit["plan_correct"] == len(faithful_plans), (
+        f"plan_correct ({audit['plan_correct']}) != saved plans ({len(faithful_plans)})"
     )
 
     logger.info("=" * 60)
@@ -334,10 +348,10 @@ def main():
     logger.info("  Total programs: %d", audit["total"])
     logger.info("  Faithful GIFT plans: %d (%.1f%%)",
                 audit["plan_correct"], 100 * coverage)
-    logger.info("  Multi-call true dataflow: %d (%.1f%%)",
-                audit["multi_call_true_dataflow"],
+    logger.info("  Multi-call true dataflow (correct only): %d (%.1f%%)",
+                audit["multi_call_true_dataflow_correct"],
                 100 * audit["true_dataflow_rate"])
-    logger.info("  Two-call plans: %d", audit["two_call_true_dataflow"])
+    logger.info("  Two-call plans (correct only): %d", audit["two_call_true_dataflow_correct"])
     logger.info("  Call count distribution: %s", audit["call_counts"])
     logger.info("=" * 60)
 

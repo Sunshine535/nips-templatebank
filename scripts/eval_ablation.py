@@ -78,8 +78,10 @@ def answer_matches(result, answer):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--variant", required=True,
-                        choices=["old_fragment_only", "gift_no_call_output",
-                                 "gift_no_active_gate", "full_gift_step"])
+                        choices=["old_fragment_only", "flat_matched_565",
+                                 "gift_no_call_output", "gift_no_active_gate",
+                                 "gift_no_explicit_refs_oracle_values",
+                                 "full_gift_step"])
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--library",
@@ -88,9 +90,11 @@ def main():
     parser.add_argument("--base_model", default="/root/assets/models/Qwen3.5-9B")
     parser.add_argument("--max_samples", type=int, default=200)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--predictions_out", default=None,
+                        help="Per-example JSONL log path (predictions, gold, exec result, error)")
     args = parser.parse_args()
 
-    is_dataflow = args.variant != "old_fragment_only"
+    is_dataflow = args.variant not in ("old_fragment_only", "flat_matched_565")
 
     ds = load_dataset("openai/gsm8k", "main", split="test")
     test_data = list(ds)[:args.max_samples]
@@ -124,11 +128,19 @@ def main():
     parsed = 0
     executable = 0
     total = 0
+    predictions_log = []
 
     for i, item in enumerate(test_data):
         total += 1
         problem = item["question"]
         answer = item["answer"].split("####")[-1].strip()
+
+        log_entry = {
+            "idx": i, "question": problem, "gold": answer,
+            "raw_response": None, "parsed": False, "parsed_obj": None,
+            "exec_ok": False, "exec_result": None, "correct": False,
+            "error": None,
+        }
 
         if is_dataflow:
             prompt = f"Problem: {problem}\n\nGenerate a dataflow composition plan (JSON):"
@@ -148,42 +160,62 @@ def main():
         response = tokenizer.decode(
             output[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True,
         )
+        log_entry["raw_response"] = response[:2000]
 
         try:
             json_match = re.search(r"\{[\s\S]*\}", response)
             if json_match is None:
+                log_entry["error"] = "no_json_match"
+                predictions_log.append(log_entry)
                 continue
             obj = json.loads(json_match.group())
-        except Exception:
+            log_entry["parsed_obj"] = obj
+        except Exception as e:
+            log_entry["error"] = f"json_parse_error: {type(e).__name__}: {str(e)[:100]}"
+            predictions_log.append(log_entry)
             continue
 
+        ok = False
+        result = None
         if is_dataflow:
             try:
                 if "calls" not in obj:
+                    log_entry["error"] = "missing_calls"
+                    predictions_log.append(log_entry)
                     continue
                 plan = DataflowPlan.from_dict(obj)
                 parsed += 1
+                log_entry["parsed"] = True
                 quantities = extract_quantities(problem)
                 ok, result, _ = df_executor.execute_with_quantities(plan, quantities)
-            except Exception:
+            except Exception as e:
+                log_entry["error"] = f"dataflow_exec_error: {type(e).__name__}: {str(e)[:100]}"
+                predictions_log.append(log_entry)
                 continue
         else:
             try:
                 prog = Program.from_dict(obj)
                 parsed += 1
+                log_entry["parsed"] = True
                 numbers = extract_numbers(problem)
                 bindings = {
                     slot.name: numbers[k] if k < len(numbers) else 0
                     for k, slot in enumerate(prog.slots)
                 }
                 ok, result, _ = flat_executor.execute(prog, bindings)
-            except Exception:
+            except Exception as e:
+                log_entry["error"] = f"flat_exec_error: {type(e).__name__}: {str(e)[:100]}"
+                predictions_log.append(log_entry)
                 continue
 
+        log_entry["exec_ok"] = bool(ok)
+        log_entry["exec_result"] = str(result) if result is not None else None
         if ok and result is not None:
             executable += 1
             if answer_matches(result, answer):
                 correct += 1
+                log_entry["correct"] = True
+        predictions_log.append(log_entry)
 
         if (i + 1) % 50 == 0:
             logger.info(
@@ -221,6 +253,16 @@ def main():
     with open(args.output, "w") as f:
         json.dump(results, f, indent=2)
     logger.info("Saved: %s", args.output)
+
+    pred_path = args.predictions_out or args.output.replace(
+        "eval_results.json", "predictions.jsonl",
+    )
+    if pred_path != args.output:
+        os.makedirs(os.path.dirname(pred_path) or ".", exist_ok=True)
+        with open(pred_path, "w") as f:
+            for entry in predictions_log:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        logger.info("Saved predictions: %s (%d entries)", pred_path, len(predictions_log))
 
 
 if __name__ == "__main__":

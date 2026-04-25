@@ -34,10 +34,10 @@ training:
   warmup_ratio: 0.03
   bf16: true
   training_data: "results/gift_step/compose_train_gift.json"
-  library: "results/gift_step/library_gift.json"
+  library_path: "results/gift_step/library_gift.json"
   format: "dataflow_plan"
 
-library:
+library_config:
   source: "step_primitives"
   min_support: 3
 

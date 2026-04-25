@@ -72,6 +72,74 @@ def build_records(variant: str, tokenizer, step_data_path: str, flat_data_path: 
             )
             records.append({"text": text})
 
+    elif variant == "flat_matched_565":
+        gift_data = json.load(open(step_data_path))
+        gift_problems = {item["problem"] for item in gift_data}
+        flat_data = json.load(open(flat_data_path))
+        matched = [item for item in flat_data if item["problem"] in gift_problems]
+        for item in matched:
+            prog_json = json.dumps(item["program"], ensure_ascii=False)
+            prompt = f"Problem: {item['problem']}\n\nGenerate an executable JSON program:"
+            messages = [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": prog_json},
+            ]
+            text = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=False,
+            )
+            records.append({"text": text})
+
+    elif variant == "gift_no_explicit_refs_oracle_values":
+        data = json.load(open(step_data_path))
+        from src.dataflow_plan import BindingRef, DataflowExecutor, DataflowPlan
+        from src.template_dsl import SubroutineLibrary
+        lib_path = step_data_path.replace("compose_train_gift.json", "library_gift.json")
+        library = SubroutineLibrary.load(lib_path)
+        executor = DataflowExecutor(library)
+        for item in data:
+            plan_dict = json.loads(json.dumps(item["plan"]))
+            quantities = item.get("quantities", {})
+            qty_map = {qid: q["value"] for qid, q in quantities.items()}
+            plan_obj = DataflowPlan.from_dict(plan_dict)
+            ok, _, _ = executor.execute_with_quantities(plan_obj, qty_map)
+            if not ok:
+                continue
+            call_outputs = {}
+            for call in plan_obj.calls:
+                sub = library.get(call.sub_id)
+                if sub is None:
+                    break
+                args_d = {}
+                for slot_name, ref in call.bindings.items():
+                    if ref.source == "quantity":
+                        args_d[slot_name] = qty_map.get(ref.qid, ref.value)
+                    elif ref.source == "call_output":
+                        args_d[slot_name] = call_outputs.get(ref.call_id)
+                    else:
+                        args_d[slot_name] = ref.value
+                ok2, result, _ = executor.executor.execute(sub.program, args_d)
+                if not ok2:
+                    break
+                call_outputs[call.call_id] = result
+            for call in plan_dict["calls"]:
+                for slot, ref in call["bindings"].items():
+                    if isinstance(ref, dict) and ref.get("source") == "call_output":
+                        cid = ref["call_id"]
+                        if cid in call_outputs:
+                            ref["source"] = "constant"
+                            ref["value"] = call_outputs[cid]
+                            ref.pop("call_id", None)
+            plan_json = json.dumps(plan_dict, ensure_ascii=False)
+            prompt = f"Problem: {item['problem']}\n\nGenerate a dataflow composition plan (JSON):"
+            messages = [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": plan_json},
+            ]
+            text = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=False,
+            )
+            records.append({"text": text})
+
     elif variant == "full_gift_step":
         data = json.load(open(step_data_path))
         for item in data:
@@ -137,8 +205,10 @@ def build_records(variant: str, tokenizer, step_data_path: str, flat_data_path: 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--variant", required=True,
-                        choices=["old_fragment_only", "gift_no_call_output",
-                                 "gift_no_active_gate", "full_gift_step"])
+                        choices=["old_fragment_only", "flat_matched_565",
+                                 "gift_no_call_output", "gift_no_active_gate",
+                                 "gift_no_explicit_refs_oracle_values",
+                                 "full_gift_step"])
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--model", default="/root/assets/models/Qwen3.5-9B")
