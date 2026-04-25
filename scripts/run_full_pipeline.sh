@@ -6,9 +6,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source "$(dirname "$0")/../.venv/bin/activate"
 
-export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
+export HF_HOME="${HF_HOME:-/openbayes/input/input0}"
+export HF_HUB_CACHE="${HF_HUB_CACHE:-$HF_HOME/hub}"
+export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-$HF_HOME/datasets}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/hub}"
+export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
+export HF_HUB_ENABLE_HF_TRANSFER="${HF_HUB_ENABLE_HF_TRANSFER:-0}"
 export TOKENIZERS_PARALLELISM=false
 export WANDB_MODE=disabled  # Disable wandb for now
+mkdir -p "$HF_HOME" "$HF_HUB_CACHE" "$HF_DATASETS_CACHE"
 
 TEMPLATE_DIR="results/templates_full"
 VERIFIED_DIR="results/templates_verified"
